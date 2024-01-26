@@ -505,7 +505,22 @@ function solve_bpc(J, E, w, W; verbose=1, run_ffd=true, epsilon=1e-4)
     
     # Truly, no easy way out, do BCPA
 
+    # initialize list
+    L_master = Model[master]
+    L_S = Array{Array{Float32}}[S]
+    L_bounds = Array{Int64}[[-1 for q in S]] 
+
+
+    function get_next_node(L_master, L_S, L_bounds)
+        return splice!(L_master, 1), splice!(L_S, 1), splice!(L_bounds, 1)
+    end
     
+    function add_to_node_list(master, S, bounds; L_master=L_master, L_S=L_S, L_bounds=L_bounds)
+        push!(L_master, master)
+        push!(L_S, S)
+        push!(L_bounds, bounds)
+    end
+
 
 
 
