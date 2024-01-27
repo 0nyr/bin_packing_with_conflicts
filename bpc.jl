@@ -311,6 +311,12 @@ function price_lp(pi_bar, w, W, J, E, S; verbose=3, epsilon=1e-4)
     # println(pi_bar)
     verbose >=3 && println(price)
     optimize!(price)
+
+    # is the price feasible?
+    if termination_status(price) != OPTIMAL
+        verbose >= 3 && println("price infeasible")
+        return 1, nothing
+    end
     
     p_obj = objective_value(price)
     verbose >=2 && println("̄c = $(p_obj)")
@@ -334,6 +340,12 @@ function int_price_lp(pi_bar, w, W, J, E, S; verbose=3, epsilon=1e-4)
     # println(pi_bar)
     verbose >=3 && println(price)
     optimize!(price)
+
+    # is the price feasible?
+    if termination_status(price) != OPTIMAL
+        verbose >= 3 && println("price infeasible")
+        return 1, nothing
+    end
     
     p_obj = objective_value(price)
     verbose >=2 && println("̄c = $(p_obj)")
@@ -359,6 +371,12 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
 
         optimize!(master)
         # println("termination optimal: ", termination_status(master) == OPTIMAL)
+
+        if termination_status(master) != OPTIMAL
+            verbose >= 3 && println("master infeasible")
+            break
+        end
+
 
         # get values to build price
         m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, verbose=verbose)
@@ -397,7 +415,11 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
         end
     end
 
-    cga_lower_bound = Int(ceil(m_obj - epsilon))
+    if m_obj == Inf
+        cga_lower_bound = Inf
+    else
+        cga_lower_bound = Int(ceil(m_obj - epsilon))
+    end
 
     return m_obj, cga_lower_bound, S_len
 end
@@ -518,7 +540,16 @@ function solve_bpc(J, E, w, W; verbose=1, run_ffd=true, epsilon=1e-4)
     # initialize list
     L = Node[Node(1, master, S, [-1 for q in S])]
 
+    while !(isempty(L))
+        current_node = splice!(L, 1)
+        
+        verbose >=1 && println("node $(current_node.id)")
+        
+        z, cga_lb, S_len = cga(node.master, price_lp, w, W, J, E, lambdas, S, S_len)
 
+        
+
+    end
 
 
 
