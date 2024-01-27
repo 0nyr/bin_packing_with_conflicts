@@ -62,7 +62,7 @@ function get_pretty_solution(bags, bags_amount, J)
 end
 
 "Utility to find most fractional item on a vector"
-function most_fractional_on_bag(solution; epsilon=1e-4)
+function most_fraction_on_vector(solution; epsilon=1e-4)
     bound_on = -1
     closest = 1
     for j in 1:length(solution)
@@ -538,16 +538,31 @@ function solve_bpc(J, E, w, W; verbose=1, run_ffd=true, epsilon=1e-4)
 
 
     # initialize list
-    L = Node[Node(1, master, S, [-1 for q in S])]
+    nodes = Node[Node(1, master, S, [-1 for q in S])]
+    queue = Int64[1]
 
-    while !(isempty(L))
-        current_node = splice!(L, 1)
+    while !(isempty(queue))
+
+        # get next node
+        next_node_id = splice!(queue, 1)
+        current_node = nodes[next_node_id]
         
         verbose >=1 && println("node $(current_node.id)")
         
+        # apply cga
         z, cga_lb, S_len = cga(node.master, price_lp, w, W, J, E, lambdas, S, S_len)
 
-        
+        # is there potential for a better solution? 
+        if cga_lb < UB 
+            
+            bound_on = most_fraction_on_vector(current_solution)
+
+        else # branch
+
+
+
+        end
+
 
     end
 
