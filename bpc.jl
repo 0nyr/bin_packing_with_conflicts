@@ -52,7 +52,7 @@ function merge_items(i, j, J, w, item_address)
 end
 
 "add edge (i, j) to E, properly translated"
-function split_items(i, j, E, item_in_address)
+function split_items(i, j, E, items_in_address)
     # first, make sure i is the lesser value and translate to original splits
     i, j = sort([items_in_address[i][1],items_in_address[j][1]])
 
