@@ -3,14 +3,19 @@ using GLPK
 using LinearAlgebra
 
 # struct representing a node in the BB tree
-struct Node
+mutable struct Node
     id::Int64
-    master::Model                  
-    S::Array{Float32}
-    S_len::Int64
+    J::Array{Int64}
+    E::Array{Int64, Int64}
+    w::Array{Int64}
+    W::Int64
+    S::Array{Float32} # needs to be pruned after a Ryan-Foster merge!
     bounds::Array{Int64}
     lambdas::Array{VariableRef}
+    item_translator::Array{Array{Int64}}
 end
+get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.bounds
+
 
 function get_edges(J, E)    
     edges = Array{Int64}[Int64[] for i in J]
@@ -82,7 +87,7 @@ end
 
 "Utility to find most fractional x in a solution"
 function most_fractional_on_solution(solution; epsilon=1e-4)
-
+    
 end
 
 "from lambda, returns x"
@@ -426,136 +431,168 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
     return m_obj, cga_lower_bound, S_len
 end
 
-function solve_bpc(J, E, w, W; verbose=1, run_ffd=true, epsilon=1e-4)
-
-    # naive solution (one item per bag)
-    naive_solution = get_naive_solution(J)
-    UB = length(J)
-    verbose >= 1 && println("Naive upper bound: $(UB)")
-    
-    # FFD heuristic for initial solution and upper bound
-    if run_ffd
-        ffd_solution, ffd_upper_bound = first_fit_decreasing(J, w, W, E, verbose=verbose>1)
-        verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
-        
-        # if a better solution than one item per bag was found 
-        if ffd_upper_bound < UB
-            UB = ffd_upper_bound
-        end
-
-        initial_solution = deepcopy(ffd_solution)
-    else
-        initial_solution = deepcopy(naive_solution)
-    end
-    
-    # get initial lower bound ( ⌈∑w/W⌉ ) 
-    LB = get_simple_lower_bound(w, W)
-    verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(LB)")
-    
-    # if an optimal solution was found
-    LB == UB && return initial_solution, UB
-    
-    # try to improve lower bound with martello L2 lower bound
-    for alpha in get_not_greater_than_half_capacity(w, W)
-        lower_bound = get_l2_lower_bound(alpha, W, w)
-        if lower_bound > LB
-            LB = lower_bound
-            verbose >= 1 && println("L2 lower bound with α = $(alpha): $(LB)")
-            
-            # if an optimal solution was found
-            LB == UB && return initial_solution, UB
-        end
-    end
-    
-    ## no easy way out, build the LP
-    best_solution = deepcopy(initial_solution)
-
-    # build master
-    master = Model(GLPK.Optimizer)
-    set_silent(master)
-    
-    # add the naive solution as lambda variables (will serve as artificial variables)
-    S = Array{Float32}[q for q in naive_solution]
-
-    # if FFD was ran pass the relevant bags to S
-    if run_ffd
-        for q in ffd_solution
-            if sum(q) > 1 # pass the relevant bags to S
-                push!(S, q)
-            end
-        end
-    end
-    S_len = length(S)
-
-    # create lambda variables from existing q ∈ S
-    i = 1
-    lambdas = VariableRef[]
-    for q in S 
-        var = @variable(master, lower_bound=0, base_name="λ_$(i)")
-        push!(lambdas, var)
-        i+=1
-    end
-
-    # demand constraints
-    for i in J
-        @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
-    end
-
-    # objective function
-    @objective(master, Min, sum(lambdas))
-
-    # show initial master
-    verbose >= 2 && println(master)
-
-    # run column generation with specialized pricing
-
-
-    
-    # run column generation with integer pricing
-    m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, verbose=verbose, epsilon=epsilon, max_iter=1e2)
-
-    # get solution values
-    lambda_bar = value.(lambdas)
-    x_bar, cga_ub = get_x(lambda_bar, S, S_len, epsilon=epsilon)
-
-    # treat current solution
-    current_solution = round_up_solution(x_bar)
-    current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
-    
-    verbose >= 1 && println("Integer CGA: $(cga_ub)")
-
-    # was there an improvement from the heuristic?
-    if cga_ub < UB
-
-        UB = cga_ub
-        best_solution = deepcopy(current_solution)
-
-        if LB == UB
-            return best_solution, UB
-        end
-    end
-    
-    # Truly, no easy way out, do BCPA
+function solve_bpc(
+    J::Array{Int64}, 
+    E::Array{Int64, Int64}, 
+    w::Array{Int64}, 
+    W::Int64; 
+    verbose::Int64=1, 
+    run_ffd::Bool=true, 
+    epsilon::Float64=1e-4,
+    )
 
 
 
-    # initialize list
-    nodes = Node[Node(1, master, S, S_len, [-1 for q in S], lambdas)]
+    # remembers how to unmerge merged items, for Ryan and Foster branching  
+    base_item_translator = Array{Int64}[[j] for j in J]
+
+    # initialize node list
+    nodes = Node[Node(1, J, E, w, W, S, [-1 for q in S], lambdas, base_item_translator)]
     queue = Int64[1]
 
+    UB = length(J)+1
+    LB = 1
+
+    # Start the tree
     while !(isempty(queue))
 
         # get next node
         next_node_id = splice!(queue, 1)
         node = nodes[next_node_id]
+        J, E, w, W, S, bounds = get_node_parameters(node)
+        verbose >=1 && println("node $(node.id)")
+
+
+        ## first try solving the node with heuristics and bounds' properties
+
+        # naive solution (one item per bag)
+        naive_solution = get_naive_solution(J)
+        node_ub = length(J)
+
+        verbose >= 1 && println("Naive upper bound: $(node_ub)")
+
+        # get initial lower bound ( ⌈∑w/W⌉ ) 
+        node_lb = get_simple_lower_bound(w, W)
+        verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
+
+        # update Upper Bound?
+        if node_ub < UB
+            UB = node_ub
+            if LB == UB
+                return naive_solution, UB
+            end
+        end    
+
+        # FFD heuristic for initial solution and upper bound
+        if run_ffd
+            ffd_solution, ffd_upper_bound = first_fit_decreasing(J, w, W, E, verbose=verbose>1)
+            verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
+            
+            # if a better solution than one item per bag was found 
+            if ffd_upper_bound < node_ub
+                node_ub = ffd_upper_bound
+            end
+    
+            initial_solution = deepcopy(ffd_solution)
+        else
+            initial_solution = deepcopy(naive_solution)
+        end
+
         
-        verbose >=1 && println("node $(current_node.id)")
+        # if an optimal solution was found
+        LB == UB && return initial_solution, UB
         
+        # try to improve lower bound with martello L2 lower bound
+        for alpha in get_not_greater_than_half_capacity(w, W)
+            lower_bound = get_l2_lower_bound(alpha, W, w)
+            if lower_bound > node_lb
+                node_lb = lower_bound
+                verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node_lb)")
+                
+                # if an optimal solution was found
+                LB == UB && return initial_solution, UB
+            end
+        end
+        
+
+        ## no easy way out, build the LP and try to solve with integer pricing
+
+        # store best solution
+        best_solution = deepcopy(initial_solution)
+        
+        # build master
+        master = Model(GLPK.Optimizer)
+        set_silent(master)
+        
+        # add the naive solution as lambda variables (will serve as artificial variables)
+        S = Array{Float32}[q for q in naive_solution]
+
+        # if FFD was ran pass the relevant bags to S
+        if run_ffd
+            for q in ffd_solution
+                if sum(q) > 1 # pass the relevant bags to S
+                    push!(S, q)
+                end
+            end
+        end
+        S_len = length(S)
+    
+        # create lambda variables from existing q ∈ S
+        i = 1
+        lambdas = VariableRef[]
+        for q in S 
+            var = @variable(master, lower_bound=0, base_name="λ_$(i)")
+            push!(lambdas, var)
+            i+=1
+        end
+    
+        # demand constraints
+        for i in J
+            @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
+        end
+    
+        # objective function
+        @objective(master, Min, sum(lambdas))
+    
+        # show initial master
+        verbose >= 2 && println(master)
+    
+        # run column generation with specialized pricing
+    
+    
+        
+        # run column generation with integer pricing
+        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+    
+        # get solution values
+        lambda_bar = value.(lambdas)
+        x_bar, cga_ub = get_x(lambda_bar, S, S_len, epsilon=epsilon)
+    
+        # treat current solution
+        current_solution = round_up_solution(x_bar)
+        current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
+        
+        verbose >= 1 && println("Integer CGA: $(cga_ub)")
+    
+        # was there an improvement from the heuristic?
+        if cga_ub < node_ub
+    
+            node_ub = cga_ub
+            best_solution = deepcopy(current_solution)
+    
+            if LB == UB
+                return best_solution, UB
+            end
+        end
+
+
+        ## BCPA
+
         # apply cga
         z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len)
 
         # is there potential for a better solution? 
-        if cga_lb < UB 
+        if cga_lb < node_ub
 
             # get lambda values of the solution
             node.lambda_bar = value.(node.lambdas)
@@ -563,20 +600,30 @@ function solve_bpc(J, E, w, W; verbose=1, run_ffd=true, epsilon=1e-4)
             # get where to bound
             bound_on = most_fractional_on_vector(node.lambda_bar)
 
-            if bound_on == -1
-
+            if bound_on == -1 # λ is integer, check x
                 
+                x_bar = get_x(node.lambda_bar, S, S_len; epsilon=epsilon)
+
+
+                # node is finished (integer solution found)
+                
+            else # 
+
 
             end
 
-        else # branch
+        else # node is finished (no point in continuing)
 
 
 
         end
 
 
+
+
     end
+    
+    verbose >= 1 && println("tree finished")
 
 
 
