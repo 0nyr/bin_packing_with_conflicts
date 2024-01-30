@@ -6,16 +6,71 @@ using LinearAlgebra
 mutable struct Node
     id::Int64
     J::Array{Int64}
-    E::Array{Int64, Int64}
+    E::Array{Array{Int64}}
     w::Array{Int64}
     W::Int64
     S::Array{Float32} # needs to be pruned after a Ryan-Foster merge!
-    bounds::Array{Int64}
+    bounds::Array{Int64} # q ∈ S: -1 if no bound, 0 if q is cut, 1 if mandatory
     lambdas::Array{VariableRef}
-    item_translator::Array{Array{Int64}}
+    items_in_address::Array{Array{Int64}}
 end
+
+"Node parameters getter"
 get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.bounds
 
+function translate_edges_to_new_address(original_E, item_address)
+    return unique(Array{Int64}[sort([item_address[e[1]], item_address[e[2]]]) for e in original_E])
+end
+
+"merges two items i and j, merging conflicts, summing their weights"
+function merge_items(i, j, J, w, item_address)
+    
+    # first, make sure i is the lesser value
+    i, j = sort([i,j])
+
+    old_address = item_address[j]
+
+    new_J = J[1:end-1]
+    new_w = Int64[0 for j in J]
+
+    # update address of j
+    item_address[j] = item_address[i]
+    
+    # "for j in original J"
+    for k in eachindex(item_address)
+
+        # update addresses of items where address > old address of j
+        if item_address[k] > old_address
+            item_address[k] -= 1
+        end
+
+        # add weight to address
+        new_w[item_address[k]] += w[k]
+    end
+
+    return new_J, new_w
+end
+
+"add edge (i, j) to E, properly translated"
+function split_items(i, j, E, item_in_address)
+    # first, make sure i is the lesser value and translate to original splits
+    i, j = sort([items_in_address[i][1],items_in_address[j][1]])
+
+    push!(E, (i, j))
+end
+
+function make_child_node(node, branch_function)
+
+    child = deepcopy(node)
+    J, E, w, W, S, bounds = get_node_parameters(child)
+
+
+
+
+    child = Node(1, J, E, w, W, S, Int64[-1 for q in S], VariableRef[], base_item_translator)
+
+    return child
+end
 
 function get_edges(J, E)    
     edges = Array{Int64}[Int64[] for i in J]
@@ -441,13 +496,14 @@ function solve_bpc(
     epsilon::Float64=1e-4,
     )
 
-
-
     # remembers how to unmerge merged items, for Ryan and Foster branching  
-    base_item_translator = Array{Int64}[[j] for j in J]
+    base_items_in_address = Array{Int64}[[j] for j in J]
+
+    # where can item j be found?
+    base_item_adress = Int64[j for j in J]
 
     # initialize node list
-    nodes = Node[Node(1, J, E, w, W, S, [-1 for q in S], lambdas, base_item_translator)]
+    nodes = Node[Node(1, J, E, w, W, S, Int64[-1 for q in S], VariableRef[], base_item_translator)]
     queue = Int64[1]
 
     UB = length(J)+1
