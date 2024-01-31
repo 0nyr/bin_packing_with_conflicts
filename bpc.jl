@@ -283,21 +283,30 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
     return m_obj, cga_lower_bound, S_len
 end
 
-"Returns 0 if the node is not locally optimal, 1 if it is, and 2 if it is globally optimal. Updates the global bounds if appropriate"
+"Updates the global bounds if appropriate. 
+
+Returns node status:
+    0: not locally optimal;
+    1: locally optimal or there is a known equal/better solution;
+    2: globally optimal.
+"
 function check_bound_status(node, bounds; verbose=1)
 
     if node.bounds[1] == node.bounds[2] # local optimal?
-
         
         if node.bounds[2] < bounds[2] # improves global bound?
             bounds[2] = node.bounds[2] 
     
             if bounds[1] == bounds[2] # global optimal
-                return 2
+                return 3
             end            
         end
     
         return 1
+    end
+
+    if node.bounds[1] >= bounds[2]
+        return 1 # there is a known equal/better solution
     end
 
     return 0 # not locally optimal
@@ -488,6 +497,11 @@ function solve_bpc(
 
         # apply cga
         z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len)
+
+        # is there already a better or equal solution?
+        if cga_lb >= bounds[2]
+            continue
+        end
 
         if cga_lb > node.bounds[1]
             verbose >= 1 && println("CGA lower bound: $(cga_lb)")
