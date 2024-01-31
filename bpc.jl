@@ -12,13 +12,15 @@ mutable struct Node
     S::Array{Float32} # needs to be pruned after a Ryan-Foster merge!
     bounds::Array{Int64} # q ∈ S: -1 if no bound, 0 if q is cut, 1 if mandatory
     lambdas::Array{VariableRef}
-    items_in_address::Array{Array{Int64}}
+    item_address::Array{Array{Int64}}
+    is_interval_graph::Bool # can DP-flow be used? 
 end
 
-"Node parameters getter"
+"node parameters getter"
 get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.bounds
 
-function translate_edges_to_new_address(original_E, item_address)
+"translate edges for new address"
+function translate_edges(original_E, item_address)
     return unique(Array{Int64}[sort([item_address[e[1]], item_address[e[2]]]) for e in original_E])
 end
 
@@ -51,25 +53,48 @@ function merge_items(i, j, J, w, item_address)
     return new_J, new_w
 end
 
-"add edge (i, j) to E, properly translated"
-function split_items(i, j, E, items_in_address)
-    # first, make sure i is the lesser value and translate to original splits
-    i, j = sort([items_in_address[i][1],items_in_address[j][1]])
-
-    push!(E, (i, j))
+"return set of items found in a set of addresses"
+function get_items_in_address(addresses, item_address)
+    
+    items = Int64[]
+    for (j, address) in enumerate(item_address)
+        if address ∈ addresses
+            push!(items, j)
+        end
+    end
+    return items
 end
 
-function make_child_node(node, branch_function)
+# "breaks a bag by adding an edge between the heaviest and the lightest item"
+
+"returns item and weight of heaviest item in a set of addresses"
+heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], get_items_in_address(addresses, item_address))
+
+"makes children with ryan and foster branching"
+function make_child_node_with_rf_branch(node::Node)
 
     child = deepcopy(node)
     J, E, w, W, S, bounds = get_node_parameters(child)
 
+    # get largest item in bag and the fractional item to bound on
 
 
+    weight_i, i = heaviest_in_address([1], item_address, w)
+    weight_j, j = heaviest_in_address([2], item_address, w)
 
-    child = Node(1, J, E, w, W, S, Int64[-1 for q in S], VariableRef[], base_item_translator)
+    # merge branch
+    new_J, new_w = merge_items(i, j, J, w, item_address)
+
+    # split branch
+    push!(E, sort([i,j]))
+
 
     return child
+end
+
+"makes children with bag branching"
+function make_child_node_with_bag_branch(node::Node)
+
 end
 
 function get_edges(J, E)    
@@ -496,14 +521,11 @@ function solve_bpc(
     epsilon::Float64=1e-4,
     )
 
-    # remembers how to unmerge merged items, for Ryan and Foster branching  
-    base_items_in_address = Array{Int64}[[j] for j in J]
-
     # where can item j be found?
     base_item_adress = Int64[j for j in J]
 
     # initialize node list
-    nodes = Node[Node(1, J, E, w, W, S, Int64[-1 for q in S], VariableRef[], base_item_translator)]
+    nodes = Node[Node(1, J, E, w, W, S, Int64[-1 for q in S], VariableRef[], base_item_translator, false)]
     queue = Int64[1]
 
     UB = length(J)+1
