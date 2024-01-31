@@ -2,6 +2,8 @@ using JuMP
 using GLPK
 using LinearAlgebra
 
+include("utils.jl")
+
 # struct representing a node in the BB tree
 mutable struct Node
     id::Int64
@@ -10,19 +12,16 @@ mutable struct Node
     w::Array{Int64}
     W::Int64
     S::Array{Float32} # needs to be pruned after a Ryan-Foster merge!
-    bounds::Array{Int64} # q ∈ S: -1 if no bound, 0 if q is cut, 1 if mandatory
-    lambdas::Array{VariableRef}
+    branches::Array{Int64} # q ∈ S: -1 if no bound, 0 if q is cut, 1 if mandatory
+    # lambdas::Array{VariableRef}
     item_address::Array{Array{Int64}}
     is_interval_graph::Bool # can DP-flow be used? 
+    bounds::Array{Int64} # [lower_bound, upper_bound]
+    solution::Array{Array{Int64}}
 end
 
 "node parameters getter"
-get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.bounds
-
-"translate edges for new address"
-function translate_edges(original_E, item_address)
-    return unique(Array{Int64}[sort([item_address[e[1]], item_address[e[2]]]) for e in original_E])
-end
+get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.branches
 
 "merges two items i and j, merging conflicts, summing their weights"
 function merge_items(i, j, J, w, item_address)
@@ -53,23 +52,6 @@ function merge_items(i, j, J, w, item_address)
     return new_J, new_w
 end
 
-"return set of items found in a set of addresses"
-function get_items_in_address(addresses, item_address)
-    
-    items = Int64[]
-    for (j, address) in enumerate(item_address)
-        if address ∈ addresses
-            push!(items, j)
-        end
-    end
-    return items
-end
-
-# "breaks a bag by adding an edge between the heaviest and the lightest item"
-
-"returns item and weight of heaviest item in a set of addresses"
-heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], get_items_in_address(addresses, item_address))
-
 "makes children with ryan and foster branching"
 function make_child_node_with_rf_branch(node::Node)
 
@@ -94,31 +76,18 @@ end
 
 "makes children with bag branching"
 function make_child_node_with_bag_branch(node::Node)
+    
+    child = deepcopy(node)
+    J, E, w, W, S, bounds = get_node_parameters(child)
 
-end
 
-function get_edges(J, E)    
-    edges = Array{Int64}[Int64[] for i in J]
-    for i in J
-        for edge in E
-            if i == edge[1]
-                push!(edges[i], edge[2])
-            elseif i == edge[2]
-                push!(edges[i], edge[1])
-            end
-        end
-    end
-    return edges
+
+
 end
 
 "returns simplest lower bound ( ceil(sum(w)/W) )"
 function get_simple_lower_bound(w, W)
     return Int64(ceil(sum(w)/W))
-end
-
-
-function get_not_greater_than_half_capacity(w, W)
-    return Int64[w_i for w_i in sort(w, rev=true) if w_i <= W/2]
 end
 
 "L2 bound - Martello1990"
@@ -129,177 +98,6 @@ function get_l2_lower_bound(alpha, W, w)
 
     return Int64(length(n1) + length(n2) + max(0, ceil( (sum(n3) - (length(n2)*W - sum(n2) ) )/W  ) )) 
 end
-
-function get_bag_weight(bag, w)
-    return sum([w[i] for i in bag])
-end
-
-function get_slack(bag, W, w)
-    return W - get_bag_weight(bag, w)
-end
-
-function get_compatible_items(bag, J, bag_conflicts, w, slack)
-    return Int64[i for i in J if i ∉ bag_conflicts && slack - w[i] >= 0]
-end
-
-"transforms solution structure from binary, same length arrays to integer, variable length arrays"
-function get_pretty_solution(bags, bags_amount, J)
-    # clean_bags = [[bags[i][j] for j in 1:bags_sizes[i]] for i in 1:bags_amount]
-    return Array{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
-end
-
-"Utility to find most fractional item on a vector"
-function most_fractional_on_vector(solution; epsilon=1e-4)
-    bound_on = -1
-    closest = 1
-    for j in 1:length(solution)
-        diff = solution[j] - floor(solution[j])
-        if diff > epsilon && diff < 1-epsilon
-            d = abs(diff - 0.5) 
-            if d < closest
-                closest = d
-                bound_on = j  
-            end
-        end
-    end
-    return bound_on
-end
-
-"Utility to find most fractional x in a solution"
-function most_fractional_on_solution(solution; epsilon=1e-4)
-    
-end
-
-"from lambda, returns x"
-function get_x(lambda_bar, S, S_len; epsilon=1e-4)
-    bags = Array{Float32}[Float32[0.0 for j in J] for i in J]
-    # bags_conflicts = Array{Bool}[Bool[0 for j in J] for i in J]
-    # bags_sizes = Int64[0 for i in J]
-
-    # get bags selected for use
-    bag_amount = 0
-    for q in 1:S_len
-        if lambda_bar[q] > epsilon
-            bag_amount+=1
-            bags[bag_amount] = lambda_bar[q]*S[q]
-        end
-    end
-    
-    return bags[1:bag_amount], bag_amount
-end
-
-floor_vector(q; epsilon=1e-4) = floor.(q .+ epsilon)
-ceil_vector(q; epsilon=1e-4) = ceil.(q .- epsilon)
-
-"rounds up the solution bags, converting to integer"
-round_up_solution(solution; epsilon=1e-4) = Array{Int64}[Int64.(ceil_vector(bag, epsilon=epsilon)) for bag in solution]
-
-
-"Prunes the excess items, prioritizing the most heavy bags"
-function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
-    
-    item_count = sum(solution)
-    excess = Int64[]
-
-    # find excess items
-    for i in J
-        if item_count[i] > 1 + epsilon
-            push!(excess, i)
-        end
-    end
-
-    if isempty(excess) # no items to prune
-        return solution, length(solution)
-    end
-    
-    # get location of all excesses
-    bag_i = 0
-    item_locations = Array{Int64}[[] for j in J]
-    for bag in solution
-        bag_i += 1
-
-        # if an item in excess is in the bag, register the bag number
-        for j in excess
-            if bag[j] > epsilon 
-                push!(item_locations[j], bag_i)
-            end
-        end
-    end
-
-    # remove item from bags, prioritizing the most heavy bags
-    bags_weights = Int64[sum([w[j] for j in bag]) for bag in solution]
-    for j in excess
-
-        # sort relevant bags by most empty first
-        most_empty_first = sort(item_locations[j], by=(x)->bags_weights[x])
-        
-        for i in most_empty_first[2:end] # remove excess amount
-            solution[i][j] = 0
-        end
-    end
-    
-    solution = solution[[i for i in 1:length(solution) if sum(solution[i]) > 0]]
-
-    return solution, length(solution)
-end
-
-function next_fit_decreasing(J, w, W, E)
-    bags = Array{Int64}[]
-    J = sort(J, rev=true, by=(x)->w[x])
-    J0 = Int64[i for i in J]
-
-    conflicts = get_edges(J, E)
-
-    for iter_i in 1:10e5
-        bag = Int64[]
-        push!(bag, splice!(J, 1))
-        # println("new bag: $(bag)")
-        
-
-        bag_weight = get_bag_weight(bag, w)
-        slack = W - bag_weight
-
-        bag_conflicts = [i for i in conflicts[bag[1]]]
-
-        cJ = get_compatible_items(bag, J, bag_conflicts, w, slack)
-        # println("compatible items: $(cJ)")
-
-
-
-        i = 1
-        while i <= length(cJ)
-            if slack - w[cJ[i]] >= 0 # add all items that fit in descending order
-                push!(bag, splice!(cJ, i))
-
-                bag_weight = get_bag_weight(bag, w)
-                slack = W - bag_weight
-
-                bag_conflicts = vcat(bag_conflicts, conflicts[bag[end]]) 
-        
-                cJ = get_compatible_items(bag, J, bag_conflicts, w, slack)
-                i=1
-            else
-                i+=1
-            end
-        end
-
-        push!(bags, bag)
-        filter!(i->i ∉ bag, J)
-
-        # println("new closed bag: $(bag)")
-        # println("remaining items: $(J)")
-        # println("remaining items' weights: $([w[i] for i in J])")
-
-        if isempty(J)
-            println("Done")
-            break
-        end
-    end
-    println("Final bags: $([i for i in bags])")
-    println("Final items weights: $([[w[j] for j in i] for i in bags])")
-    return bags
-end
-
 
 "apply First Fit Decreasing heuristic"
 function first_fit_decreasing(J, w, W, E; verbose=true)
@@ -354,32 +152,6 @@ function first_fit_decreasing(J, w, W, E; verbose=true)
     bags = bags[1:bags_amount]
 
     return bags, bags_amount
-
-    # println("Final bags: $([i[] for i in bags])")
-    # println("Final items weights: $([[w[j] for j in i] for i in bags])")
-end
-
-"Naive solution, one item per bag"
-function get_naive_solution(J)
-    naive_solution = Array{Int64}[Int64[0 for j in J] for i in J]
-    for i in J # one item per bag
-        naive_solution[i][i] = 1
-    end
-    return naive_solution
-end
-
-get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]
-reduced_cost(x, pi_bar, J) = 1 - sum([pi_bar[j]*x[j] for j ∈ J])
-
-"Utility function for retrieving master data necessary for the pricing step"
-function get_master_data_for_pricing(master, J; verbose=2)
-    m_obj = objective_value(master)
-    verbose >= 2 && println("Z = $(m_obj)")
-
-    demand_constraints = get_demand_constraints(master, J)
-    pi_bar = dual.(demand_constraints)
-
-    return m_obj, demand_constraints, pi_bar
 end
 
 "Runs pricing linear programming"
@@ -511,6 +283,26 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
     return m_obj, cga_lower_bound, S_len
 end
 
+"Returns 0 if the node is not locally optimal, 1 if it is, and 2 if it is globally optimal. Updates the global bounds if appropriate"
+function check_bound_status(node, bounds; verbose=1)
+
+    if node.bounds[1] == node.bounds[2] # local optimal?
+
+        
+        if node.bounds[2] < bounds[2] # improves global bound?
+            bounds[2] = node.bounds[2] 
+    
+            if bounds[1] == bounds[2] # global optimal
+                return 2
+            end            
+        end
+    
+        return 1
+    end
+
+    return 0 # not locally optimal
+end
+
 function solve_bpc(
     J::Array{Int64}, 
     E::Array{Int64, Int64}, 
@@ -520,16 +312,20 @@ function solve_bpc(
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
     )
+    
+    item_amount = length(J)
 
-    # where can item j be found?
+    # [LB, UB]
+    bounds = [1, item_amount+1]
+
+    # where can item j be found? (for merging items)
     base_item_adress = Int64[j for j in J]
-
+    
     # initialize node list
-    nodes = Node[Node(1, J, E, w, W, S, Int64[-1 for q in S], VariableRef[], base_item_translator, false)]
+    nodes = Node[Node(1, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), Array{Int64}[])]
     queue = Int64[1]
-
-    UB = length(J)+1
-    LB = 1
+    
+    best_node = nodes[1]
 
     # Start the tree
     while !(isempty(queue))
@@ -540,26 +336,28 @@ function solve_bpc(
         J, E, w, W, S, bounds = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
-
         ## first try solving the node with heuristics and bounds' properties
 
         # naive solution (one item per bag)
         naive_solution = get_naive_solution(J)
-        node_ub = length(J)
+        node.bounds[2] = item_amount
 
-        verbose >= 1 && println("Naive upper bound: $(node_ub)")
+        verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
 
         # get initial lower bound ( ⌈∑w/W⌉ ) 
-        node_lb = get_simple_lower_bound(w, W)
+        node.bounds[1] = get_simple_lower_bound(w, W)
         verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
 
-        # update Upper Bound?
-        if node_ub < UB
-            UB = node_ub
-            if LB == UB
-                return naive_solution, UB
+        # update bounds status
+        optimality = check_bound_status(node, bounds, verbose=verbose)
+        if optimality != 0 # is it a global or local optimal?
+            if optimality == 1 # local optimal
+                # prune the tree
+                continue
+            else # global optimal
+                return naive_solution, bounds[2]
             end
-        end    
+        end
 
         # FFD heuristic for initial solution and upper bound
         if run_ffd
@@ -567,28 +365,44 @@ function solve_bpc(
             verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
             
             # if a better solution than one item per bag was found 
-            if ffd_upper_bound < node_ub
-                node_ub = ffd_upper_bound
+            if ffd_upper_bound < node.bounds[2]
+                node.bounds[2] = ffd_upper_bound
+                
+                # update bounds status
+                optimality = check_bound_status(node, bounds, verbose=verbose)
+                if optimality != 0 # is it a global or local optimal?
+                    if optimality == 1 # local optimal
+                        # prune the tree
+                        continue
+                    else # global optimal
+                        return ffd_solution, bounds[2]
+                    end
+                end   
             end
     
             initial_solution = deepcopy(ffd_solution)
         else
             initial_solution = deepcopy(naive_solution)
         end
-
-        
-        # if an optimal solution was found
-        LB == UB && return initial_solution, UB
         
         # try to improve lower bound with martello L2 lower bound
         for alpha in get_not_greater_than_half_capacity(w, W)
             lower_bound = get_l2_lower_bound(alpha, W, w)
-            if lower_bound > node_lb
-                node_lb = lower_bound
+            if lower_bound > node.bounds[1]
+
+                node.bounds[1] = lower_bound
                 verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node_lb)")
-                
-                # if an optimal solution was found
-                LB == UB && return initial_solution, UB
+
+                # update bounds status
+                optimality = check_bound_status(node, bounds, verbose=verbose)
+                if optimality != 0 # is it a global or local optimal?
+                    if optimality == 1 # local optimal
+                        # prune the tree
+                        continue
+                    else # global optimal
+                        return initial_solution, bounds[2]
+                    end
+                end    
             end
         end
         
@@ -613,6 +427,7 @@ function solve_bpc(
                 end
             end
         end
+        node.S = S
         S_len = length(S)
     
         # create lambda variables from existing q ∈ S
@@ -636,9 +451,7 @@ function solve_bpc(
         verbose >= 2 && println(master)
     
         # run column generation with specialized pricing
-    
-    
-        
+
         # run column generation with integer pricing
         m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, verbose=verbose, epsilon=epsilon, max_iter=1e2)
     
@@ -650,17 +463,24 @@ function solve_bpc(
         current_solution = round_up_solution(x_bar)
         current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
         
-        verbose >= 1 && println("Integer CGA: $(cga_ub)")
+        verbose >= 1 && println("Integer CGA upper bound: $(cga_ub)")
     
         # was there an improvement from the heuristic?
-        if cga_ub < node_ub
+        if cga_ub < node.bounds[2]
     
-            node_ub = cga_ub
+            node.bounds[2] = cga_ub
             best_solution = deepcopy(current_solution)
-    
-            if LB == UB
-                return best_solution, UB
-            end
+            
+            # update bounds status
+            optimality = check_bound_status(node, bounds, verbose=verbose)
+            if optimality != 0 # is it a global or local optimal?
+                if optimality == 1 # local optimal
+                    # prune the tree
+                    continue
+                else # global optimal
+                    return best_solution, bounds[2]
+                end
+            end  
         end
 
 
@@ -669,8 +489,23 @@ function solve_bpc(
         # apply cga
         z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len)
 
+        if cga_lb > node.bounds[1]
+            verbose >= 1 && println("CGA lower bound: $(cga_lb)")
+
+            node.bounds[1] = cga_lb
+
+            # update bounds status
+            optimality = check_bound_status(node, bounds, verbose=verbose)
+            if optimality != 0 # is it a global or local optimal?
+                if optimality == 1 # local optimal
+                    # prune the tree
+                    continue
+                end
+            end  
+        end
+
         # is there potential for a better solution? 
-        if cga_lb < node_ub
+        if cga_lb < node.bounds[2]
 
             # get lambda values of the solution
             node.lambda_bar = value.(node.lambdas)
@@ -721,7 +556,7 @@ function solve_bpc(
     
     solution = get_pretty_solution(solution, 5, J)
 
-    return solution, UB
+    return solution, bounds[2]
 
 
     return false, false
