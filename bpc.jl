@@ -104,6 +104,11 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address, items_in_a
     # remove edges containing removed items
     new_E = [e for e in E if !(e[1] ∈ q) && !(e[2] ∈ q)]
 
+    # update weights
+    for (j, address) in item_address
+        new_w[address] += w[j]
+    end
+
     return new_J, new_E
 end
 
