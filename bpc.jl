@@ -14,7 +14,7 @@ mutable struct Node
     W::Int64
     S::Array{Array{Float32}} # needs to be pruned after a Ryan-Foster merge!
     mandatory_bags::Array{Array{Int64}} # mandatory q ∈ S
-    no_good_bags::Array{Array{Float32}} # forbidden q ∈ S
+    forbidden_bags::Array{Array{Float32}} # forbidden q ∈ S
     # lambdas::Array{VariableRef}
     item_address::Array{Array{Int64}}
     interval_graph::Bool # can DP-flow be used? 
@@ -80,7 +80,7 @@ function make_child_node_with_rf_branch(node::Node)
 end
 
 "removes items in q from J and E, updating addresses as necessary"
-function remove_from_graph(q, q_on_original_G, J, E, w, item_address, items_in_address)
+function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 
     items_amount = length(J)
     amount_to_remove = length(q)
@@ -112,7 +112,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address, items_in_a
         new_w[address] += w[j]
     end
 
-    return new_J, new_E
+    return new_J, new_E, new_w
 end
 
 "makes children with bag branching"
@@ -130,18 +130,23 @@ function make_child_node_with_bag_branch(node::Node, q::Array{Float32}, queue, n
     # end
 
     
-    # get positive child (variable to branch on >= 1)
-    positive_child = deepcopy(node)
-    J, E, w, W, S, bounds = get_node_parameters(positive_child)
+    # get positive child (variable to branch on >= 1) 
+    # the items in mandatory bags (λ >= 1) are *removed* from the graph and only considered when computing bounds
+    pos_child = deepcopy(node)
+    J, E, w, W, S, bounds = get_node_parameters(pos_child)
     
-    # mandatory bags' items are *removed* from the graph and only considered when computing bounds
-    push!(positive_child.mandatory_bags, q)
-    
+    # add bag to mandatory set
+    push!(pos_child.mandatory_bags, q_on_original_G)
+
+    # remove the items in the mandatory bag from the graph
+    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, w, pos_child.item_address)
     
 
-    
+
     # get negative child (variable to branch on <= 0)
-    J, E, w, W, S, bounds = get_node_parameters(child)
+    # the forbidden bag will be cut with a no good cut (non-robust!)
+    neg_child = deepcopy(node)
+    push!(neg_child.forbidden_bags, q_on_original_G)
 
 
 
