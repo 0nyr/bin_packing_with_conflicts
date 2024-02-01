@@ -55,32 +55,86 @@ function get_pretty_solution(bags, bags_amount, J)
 end
 
 "Utility to find most fractional item on a vector"
-function most_fractional_on_vector(solution; epsilon=1e-4)
+function most_fractional_on_vector(v; epsilon=1e-4)
     bound_on = -1
     closest = 1
-    for j in 1:length(solution)
-        diff = solution[j] - floor(solution[j])
+    for (n, j) in enumerate(v)
+        diff = j - floor(j)
         if diff > epsilon && diff < 1-epsilon
             d = abs(diff - 0.5) 
             if d < closest
                 closest = d
-                bound_on = j  
+                bound_on = n  
             end
         end
     end
     return bound_on
 end
 
-"Utility to find most fractional x in a solution"
-function most_fractional_on_solution(solution; epsilon=1e-4)
+"Utility to find most fractional integer bag and most fractional item in a solution"
+function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon=1e-4)
+    most_fractional_bag = -1
+    most_fractional_item = [-1, -1]
+    bag_closest = 1
+    item_closest = 1
+
+    for q in bags_in_use
+        
+        for (j, x_j) in enumerate(S[q])
+            is_bag_integer = true
+
+            d = lambda_bar[q]*x_j
+            diff = d - floor(d)
+            
+            if diff > epsilon && diff < 1-epsilon
+                is_bag_integer = false
+
+                d = abs(diff - 0.5) 
+                if d < item_closest
+                    item_closest = d
+                    most_fractional_item = [q, j]  
+                end
+            end
+
+        end
+
+        if is_bag_integer
+            d = lambda_bar[q]
+            diff = lambda_bar[q] - floor(lambda_bar[q])
+            
+            if diff > epsilon && diff < 1-epsilon
+
+                d = abs(diff - 0.5) 
+                if d < bag_closest
+                    bag_closest = d
+                    most_fractional_bag = q  
+                end
+            end
+        end
+
+    end
+
+    return most_fractional_bag, most_fractional_item
+end
+
+"returns {i | λ_i > 0 ∀ i}"
+function get_bags_in_use(lambda_bar, S, S_len, J; epsilon=1e-4)
+    # bags = Array{Float32}[Float32[0.0 for j in J] for i in J]
+    bags_in_use = Int64[]
+
+    # get bags selected for use
+    for q in 1:S_len
+        if lambda_bar[q] > epsilon 
+            push!(bags_in_use, q)
+        end
+    end
     
+    return bags_in_use
 end
 
 "from lambda, returns x"
-function get_x(lambda_bar, S, S_len; epsilon=1e-4)
+function get_x(lambda_bar, S, S_len, J; epsilon=1e-4)
     bags = Array{Float32}[Float32[0.0 for j in J] for i in J]
-    # bags_conflicts = Array{Bool}[Bool[0 for j in J] for i in J]
-    # bags_sizes = Int64[0 for i in J]
 
     # get bags selected for use
     bag_amount = 0
@@ -93,6 +147,7 @@ function get_x(lambda_bar, S, S_len; epsilon=1e-4)
     
     return bags[1:bag_amount], bag_amount
 end
+
 
 floor_vector(q; epsilon=1e-4) = floor.(q .+ epsilon)
 ceil_vector(q; epsilon=1e-4) = ceil.(q .- epsilon)

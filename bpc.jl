@@ -7,6 +7,7 @@ include("utils.jl")
 # struct representing a node in the BB tree
 mutable struct Node
     id::Int64
+    parent::Int64
     J::Array{Int64}
     E::Array{Array{Int64}}
     w::Array{Int64}
@@ -332,7 +333,7 @@ function solve_bpc(
     base_item_adress = Int64[j for j in J]
     
     # initialize node list
-    nodes = Node[Node(1, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), 0, Array{Int64}[])]
+    nodes = Node[Node(1, 0, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), 0, Array{Int64}[])]
     queue = Int64[1]
     
     best_node = Int64[1]
@@ -467,7 +468,7 @@ function solve_bpc(
     
         # get solution values
         lambda_bar = value.(lambdas)
-        x_bar, cga_ub = get_x(lambda_bar, S, S_len, epsilon=epsilon)
+        x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
     
         # treat current solution
         current_solution = round_up_solution(x_bar)
@@ -521,21 +522,40 @@ function solve_bpc(
 
 
         # get lambda values of the solution
-        node.lambda_bar = value.(node.lambdas)
+        lambda_bar = value.(lambdas)
         
-        # get where to bound
-        bound_on = most_fractional_on_vector(node.lambda_bar)
+        # get branching candidates
+        bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
+        most_fractional_bag, most_fractional_item = check_solution_fractionality(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
+
+
+        # is there an integer bag to branch on? 
+        # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
+        if most_fractional_bag != -1
+
+            make_child_node_with_bag_branch
+
+        # if not, is there an item to branch on? (Ryan and Foster branching)
+        elseif most_fractional_item[1] != -1
+
+            make_child_node_with_rf_branch
+
+
+        
+        else # the solution is integer!
+
+        end
+
         if bound_on == -1 # λ is integer, check x
             
-            x_bar = get_x(node.lambda_bar, S, S_len; epsilon=epsilon)
+            x_bar, bag_amount = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
 
-
-            # node is finished (integer solution found)
+            most_fractional_on_solution(x_bar)
             
         else # bound on most fractional λ
 
 
-            
+
 
         end
 
