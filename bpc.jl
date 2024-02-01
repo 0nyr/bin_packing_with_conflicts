@@ -359,9 +359,9 @@ function solve_bpc(
         verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
 
         # update bounds status
-        optimality = update_bounds_status(node, bounds, verbose=verbose)
-        if optimality != 0 # is it a global or local optimal?
-            if optimality == 1 # local optimal
+        bound_status = update_bounds_status(node, bounds, verbose=verbose)
+        if bound_status != 0 # is it a global or local optimal?
+            if bound_status == 1 # local optimal
                 # prune the tree
                 continue
             else # global optimal
@@ -379,9 +379,9 @@ function solve_bpc(
                 node.bounds[2] = ffd_upper_bound
                 
                 # update bounds status
-                optimality = update_bounds_status(node, bounds, verbose=verbose)
-                if optimality != 0 # is it a global or local optimal?
-                    if optimality == 1 # local optimal
+                bound_status = update_bounds_status(node, bounds, verbose=verbose)
+                if bound_status != 0 # is it a global or local optimal?
+                    if bound_status == 1 # local optimal
                         # prune the tree
                         continue
                     else # global optimal
@@ -404,9 +404,9 @@ function solve_bpc(
                 verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node_lb)")
 
                 # update bounds status
-                optimality = update_bounds_status(node, bounds, verbose=verbose)
-                if optimality != 0 # is it a global or local optimal?
-                    if optimality == 1 # local optimal
+                bound_status = update_bounds_status(node, bounds, verbose=verbose)
+                if bound_status != 0 # is it a global or local optimal?
+                    if bound_status == 1 # local optimal
                         # prune the tree
                         continue
                     else # global optimal
@@ -482,9 +482,9 @@ function solve_bpc(
             best_solution = deepcopy(current_solution)
             
             # update bounds status
-            optimality = update_bounds_status(node, bounds, verbose=verbose)
-            if optimality != 0 # is it a global or local optimal?
-                if optimality == 1 # local optimal
+            bound_status = update_bounds_status(node, bounds, verbose=verbose)
+            if bound_status != 0 # is it a global or local optimal?
+                if bound_status == 1 # local optimal
                     # prune the tree
                     continue
                 else # global optimal
@@ -510,9 +510,9 @@ function solve_bpc(
             node.bounds[1] = cga_lb
 
             # update bounds status
-            optimality = update_bounds_status(node, bounds, verbose=verbose)
-            if optimality != 0 # is it a global or local optimal?
-                if optimality == 1 # local optimal
+            bound_status = update_bounds_status(node, bounds, verbose=verbose)
+            if bound_status != 0 # is it a global or local optimal?
+                if bound_status == 1 # local optimal
                     # prune the tree
                     continue
                 end
