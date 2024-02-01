@@ -51,6 +51,9 @@ function merge_items(i, j, J, w, E, item_address)
         new_w[item_address[k]] += w[k]
     end
 
+    # translate edges
+    new_E = translate_edges(E, item_address)
+
     return new_J, new_w, new_E
 end
 
