@@ -17,6 +17,7 @@ mutable struct Node
     item_address::Array{Array{Int64}}
     is_interval_graph::Bool # can DP-flow be used? 
     bounds::Array{Int64} # [lower_bound, upper_bound]
+    bounds_status::Int64
     solution::Array{Array{Int64}}
 end
 
@@ -283,13 +284,13 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
     return m_obj, cga_lower_bound, S_len
 end
 
-"Updates the global bounds if appropriate. 
+"""Updates the current global bounds and best node if appropriate, and sets the node's status:
 
-Returns node status:
     0: not locally optimal;
     1: locally optimal or there is a known equal/better solution;
-    2: globally optimal.
-"
+    2: improves the global best.
+    3: is the global 
+"""
 function check_bound_status(node, bounds; verbose=1)
 
     if node.bounds[1] == node.bounds[2] # local optimal?
@@ -298,18 +299,21 @@ function check_bound_status(node, bounds; verbose=1)
             bounds[2] = node.bounds[2] 
     
             if bounds[1] == bounds[2] # global optimal
-                return 3
+                node.bounds_status = 2
+                return
             end            
         end
-    
-        return 1
+
+        node.bounds_status = 1
+        return 
+
+    elseif node.bounds[1] >= bounds[2] && 
+        node.bounds_status = 1 # there is a known equal/better solution
+        return 
     end
 
-    if node.bounds[1] >= bounds[2]
-        return 1 # there is a known equal/better solution
-    end
-
-    return 0 # not locally optimal
+    node.bounds_status = 0 # not locally optimal
+    return 
 end
 
 function solve_bpc(
@@ -331,7 +335,7 @@ function solve_bpc(
     base_item_adress = Int64[j for j in J]
     
     # initialize node list
-    nodes = Node[Node(1, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), Array{Int64}[])]
+    nodes = Node[Node(1, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), 0, Array{Int64}[])]
     queue = Int64[1]
     
     best_node = nodes[1]
