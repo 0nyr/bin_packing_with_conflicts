@@ -284,36 +284,33 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
     return m_obj, cga_lower_bound, S_len
 end
 
-"""Updates the current global bounds and best node if appropriate, and sets the node's status:
+"""Updates the current global bounds and best node if appropriate, and returns the bounds' status:
 
-    0: not locally optimal;
-    1: locally optimal or there is a known equal/better solution;
-    2: improves the global best.
-    3: is the global 
+    0: node not done;
+    1: node done;
+    2: global done;
 """
-function check_bound_status(node, bounds; verbose=1)
+function update_bounds_status(node, bounds, best_node; verbose=1)
 
-    if node.bounds[1] == node.bounds[2] # local optimal?
-        
-        if node.bounds[2] < bounds[2] # improves global bound?
-            bounds[2] = node.bounds[2] 
+    status = 0
     
-            if bounds[1] == bounds[2] # global optimal
-                node.bounds_status = 2
-                return
-            end            
+    if node.bounds[2] < bounds[2] # is there a new best solution?
+        status = 1
+        bounds[2] = node.bounds[2]
+        best_node = node.id
+
+        if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
+            status = 2
         end
 
-        node.bounds_status = 1
-        return 
+    elseif node.bounds[1] == node.bounds[2] # is it locally optimal? 
+        status = 1
 
-    elseif node.bounds[1] >= bounds[2] && 
-        node.bounds_status = 1 # there is a known equal/better solution
-        return 
+    elseif node.bounds[1] >= bounds[2] # should the algorithm stop processing the node?
+        status = 1
     end
 
-    node.bounds_status = 0 # not locally optimal
-    return 
+    return status
 end
 
 function solve_bpc(
@@ -338,7 +335,7 @@ function solve_bpc(
     nodes = Node[Node(1, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), 0, Array{Int64}[])]
     queue = Int64[1]
     
-    best_node = nodes[1]
+    best_node = Int64[1]
 
     # Start the tree
     while !(isempty(queue))
@@ -362,7 +359,7 @@ function solve_bpc(
         verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
 
         # update bounds status
-        optimality = check_bound_status(node, bounds, verbose=verbose)
+        optimality = update_bounds_status(node, bounds, verbose=verbose)
         if optimality != 0 # is it a global or local optimal?
             if optimality == 1 # local optimal
                 # prune the tree
@@ -382,7 +379,7 @@ function solve_bpc(
                 node.bounds[2] = ffd_upper_bound
                 
                 # update bounds status
-                optimality = check_bound_status(node, bounds, verbose=verbose)
+                optimality = update_bounds_status(node, bounds, verbose=verbose)
                 if optimality != 0 # is it a global or local optimal?
                     if optimality == 1 # local optimal
                         # prune the tree
@@ -407,7 +404,7 @@ function solve_bpc(
                 verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node_lb)")
 
                 # update bounds status
-                optimality = check_bound_status(node, bounds, verbose=verbose)
+                optimality = update_bounds_status(node, bounds, verbose=verbose)
                 if optimality != 0 # is it a global or local optimal?
                     if optimality == 1 # local optimal
                         # prune the tree
@@ -485,7 +482,7 @@ function solve_bpc(
             best_solution = deepcopy(current_solution)
             
             # update bounds status
-            optimality = check_bound_status(node, bounds, verbose=verbose)
+            optimality = update_bounds_status(node, bounds, verbose=verbose)
             if optimality != 0 # is it a global or local optimal?
                 if optimality == 1 # local optimal
                     # prune the tree
@@ -513,7 +510,7 @@ function solve_bpc(
             node.bounds[1] = cga_lb
 
             # update bounds status
-            optimality = check_bound_status(node, bounds, verbose=verbose)
+            optimality = update_bounds_status(node, bounds, verbose=verbose)
             if optimality != 0 # is it a global or local optimal?
                 if optimality == 1 # local optimal
                     # prune the tree
