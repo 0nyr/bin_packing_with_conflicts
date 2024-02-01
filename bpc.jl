@@ -519,32 +519,26 @@ function solve_bpc(
             end  
         end
 
-        # is there potential for a better solution? 
-        if cga_lb < node.bounds[2]
 
-            # get lambda values of the solution
-            node.lambda_bar = value.(node.lambdas)
+        # get lambda values of the solution
+        node.lambda_bar = value.(node.lambdas)
+        
+        # get where to bound
+        bound_on = most_fractional_on_vector(node.lambda_bar)
+        if bound_on == -1 # λ is integer, check x
             
-            # get where to bound
-            bound_on = most_fractional_on_vector(node.lambda_bar)
-
-            if bound_on == -1 # λ is integer, check x
-                
-                x_bar = get_x(node.lambda_bar, S, S_len; epsilon=epsilon)
+            x_bar = get_x(node.lambda_bar, S, S_len; epsilon=epsilon)
 
 
-                # node is finished (integer solution found)
-                
-            else # 
+            # node is finished (integer solution found)
+            
+        else # bound on most fractional λ
 
 
-            end
-
-        else # node is finished (no point in continuing)
-
-
+            
 
         end
+
 
 
 
