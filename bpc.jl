@@ -12,13 +12,13 @@ mutable struct Node
     E::Array{Array{Int64}}
     w::Array{Int64}
     W::Int64
-    S::Array{Float32} # needs to be pruned after a Ryan-Foster merge!
-    branches::Array{Int64} # q ∈ S: -1 if no bound, 0 if q is cut, 1 if mandatory
+    S::Array{Array{Float32}} # needs to be pruned after a Ryan-Foster merge!
+    mandatory_bags::Array{Array{Int64}} # mandatory q ∈ S
+    no_good_bags::Array{Array{Float32}} # forbidden q ∈ S
     # lambdas::Array{VariableRef}
     item_address::Array{Array{Int64}}
-    is_interval_graph::Bool # can DP-flow be used? 
+    interval_graph::Bool # can DP-flow be used? 
     bounds::Array{Int64} # [lower_bound, upper_bound]
-    bounds_status::Int64
     solution::Array{Array{Int64}}
 end
 
@@ -26,7 +26,7 @@ end
 get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.branches
 
 "merges two items i and j, merging conflicts, summing their weights"
-function merge_items(i, j, J, w, item_address)
+function merge_items(i, j, J, w, E, item_address)
     
     # first, make sure i is the lesser value
     i, j = sort([i,j])
@@ -51,7 +51,7 @@ function merge_items(i, j, J, w, item_address)
         new_w[item_address[k]] += w[k]
     end
 
-    return new_J, new_w
+    return new_J, new_w, new_E
 end
 
 "makes children with ryan and foster branching"
@@ -67,7 +67,7 @@ function make_child_node_with_rf_branch(node::Node)
     weight_j, j = heaviest_in_address([2], item_address, w)
 
     # merge branch
-    new_J, new_w = merge_items(i, j, J, w, item_address)
+    new_J, new_w = merge_items(i, j, J, w, E, item_address)
 
     # split branch
     push!(E, sort([i,j]))
@@ -76,10 +76,76 @@ function make_child_node_with_rf_branch(node::Node)
     return child
 end
 
+"removes items in q from J and E, updating addresses as necessary"
+function remove_from_graph(q, q_on_original_G, J, E, w, item_address, items_in_address)
+
+    items_amount = length(J)
+    amount_to_remove = length(q)
+
+    new_J = Int64[j for j in 1:items_amount-amount_to_remove]
+    new_w = Int64[0 for j in new_J]
+        
+    # removing
+    for i in q_on_original_G
+        item_address[i] = 0
+    end
+
+    # updating addresses
+    # from largest to smallest k ∈ q:
+    #   move to the left all items which address' > k
+    for k in amount_to_remove:1
+        for (j, address) in item_address
+            if address > q[k]
+                item_address[j] -= 1 
+            end
+        end
+    end
+
+    # update addresses considering the removal
+    for v in q_on_original_G
+        for j in J[v+1:end]
+
+
+            for original_j in items_in_address[j]
+                item_address[original_j] -= 1
+            end
+
+        end
+    end
+
+
+    # remove edges
+    new_E = [e for e in E if !(v ∈ e)]
+
+    return new_J, new_E
+end
+
 "makes children with bag branching"
-function make_child_node_with_bag_branch(node::Node)
+function make_child_node_with_bag_branch(node::Node, q::Array{Float32}, queue, nodes)
     
-    child = deepcopy(node)
+    q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
+    q_on_original_G = get_items_in_address(q, node.item_address) # convert q to original G = (V, E)
+    
+    # who lives at address j?
+    # items_in_address = Array{Int64}[Int64[] for j in J]
+    # for (j, address) in enumerate(item_address)
+    #     if address > 0
+    #         push!(items_in_address[address], j)
+    #     end
+    # end
+
+    
+    # get positive child (variable to branch on >= 1)
+    positive_child = deepcopy(node)
+    J, E, w, W, S, bounds = get_node_parameters(positive_child)
+    
+    # mandatory bags' items are *removed* from the graph and only considered when computing bounds
+    push!(positive_child.mandatory_bags, q)
+    
+    
+
+    
+    # get negative child (variable to branch on <= 0)
     J, E, w, W, S, bounds = get_node_parameters(child)
 
 
@@ -533,7 +599,10 @@ function solve_bpc(
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
         if most_fractional_bag != -1
 
-            make_child_node_with_bag_branch
+            # get q to branch on
+            q = S[most_fractional_bag]
+
+            make_child_node_with_bag_branch 
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
