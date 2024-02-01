@@ -101,21 +101,8 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address, items_in_a
         end
     end
 
-    # update addresses considering the removal
-    for v in q_on_original_G
-        for j in J[v+1:end]
-
-
-            for original_j in items_in_address[j]
-                item_address[original_j] -= 1
-            end
-
-        end
-    end
-
-
-    # remove edges
-    new_E = [e for e in E if !(v ∈ e)]
+    # remove edges containing removed items
+    new_E = [e for e in E if !(e[1] ∈ q) && !(e[2] ∈ q)]
 
     return new_J, new_E
 end
