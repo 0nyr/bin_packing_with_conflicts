@@ -295,15 +295,15 @@ function update_bounds_status(node, bounds, best_node; verbose=1)
     status = 0
     
     if node.bounds[2] < bounds[2] # is there a new best solution?
-        status = 1
         bounds[2] = node.bounds[2]
         best_node = node.id
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
         end
+    end
 
-    elseif node.bounds[1] == node.bounds[2] # is it locally optimal? 
+    if node.bounds[1] == node.bounds[2] # is it locally optimal? 
         status = 1
 
     elseif node.bounds[1] >= bounds[2] # should the algorithm stop processing the node?
