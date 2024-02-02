@@ -200,8 +200,8 @@ function get_l2_lower_bound(alpha, W, w)
     return Int64(length(n1) + length(n2) + max(0, ceil( (sum(n3) - (length(n2)*W - sum(n2) ) )/W  ) )) 
 end
 
-"apply First Fit Decreasing heuristic"
-function first_fit_decreasing(J, w, W, E; verbose=true)
+"apply First Fit Decreasing heuristic considering conflicts"
+function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
     bags = Array{Int64}[Int64[0 for j in J] for i in J]
     # bags = Array{Bool}[Bool[0 for j in J] for i in J]
     bags_sizes = Int64[0 for i in J]
@@ -249,6 +249,8 @@ function first_fit_decreasing(J, w, W, E; verbose=true)
             end
         end
     end
+
+
 
     bags = bags[1:bags_amount]
 
@@ -491,7 +493,10 @@ function solve_bpc(
         J, E, w, W, S, bounds = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
-        
+        # get translated mandatory/forbidden bags
+        forbidden_bags = [get_items_in_address(bag, node.item_address) for bag in node.forbidden_bags]
+        # mandatory_bags = [get_items_in_address(bag, node.item_address) for bag in node.mandatory_bags]
+
 
         ## first try solving the node with heuristics and bounds' properties
 
@@ -519,7 +524,7 @@ function solve_bpc(
 
         # FFD heuristic for initial solution and upper bound
         if run_ffd
-            ffd_solution, ffd_upper_bound = first_fit_decreasing(J, w, W, E, verbose=verbose>1)
+            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, E, verbose=verbose>1)
             verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
             
             # if a better solution than one item per bag was found 
