@@ -7,7 +7,6 @@ include("utils.jl")
 # struct representing a node in the BB tree
 mutable struct Node
     id::Int64
-    parent::Int64
     priority::Int64 
     J::Array{Int64}
     E::Array{Array{Int64}}
@@ -15,7 +14,8 @@ mutable struct Node
     W::Int64
     S::Array{Array{Float32}} # needs to be pruned after a Ryan-Foster merge!
     mandatory_bags::Array{Array{Int64}} # mandatory q ∈ S
-    forbidden_bags::Array{Array{Float32}} # forbidden q ∈ S
+    mandatory_bag_amount::Int64
+    forbidden_bags::Array{Array{Int64}} # forbidden q ∈ S
     # lambdas::Array{VariableRef}
     item_address::Array{Array{Int64}}
     interval_graph::Bool # can DP-flow be used? 
@@ -24,7 +24,7 @@ mutable struct Node
 end
 
 "node parameters getter"
-get_node_parameters(node:Node) = node.J, node.E, node.w, node.W, node.S, node.branches
+get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S, node.branches
 
 "merges two items i and j, merging conflicts, summing their weights"
 function merge_items(i, j, J, w, E, item_address)
@@ -135,7 +135,7 @@ end
 function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
-    q_on_original_G = get_items_in_address(q, node.item_address) # convert q to original G = (V, E)
+    q_on_original_G = get_items_in_address(q, node.item_address) # convert q to original G = (V, E), variable length
     
     # who lives at address j?
     # items_in_address = Array{Int64}[Int64[] for j in J]
@@ -256,12 +256,17 @@ function first_fit_decreasing(J, w, W, E; verbose=true)
 end
 
 "Runs pricing linear programming"
-function price_lp(pi_bar, w, W, J, E, S; verbose=3, epsilon=1e-4)
+function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     price = Model(GLPK.Optimizer)
     @variable(price, 1 >= x[1:length(J)] >= 0)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
+    end
+
+    # cut forbidden bags
+    for (i, q) in enumerate(forbidden_bags)
+        @constraint(price, sum([q[j]*x[j] + (1-q[j])*(1-x[j]) for j in J]) <= length(J) - 1, base_name="forbidden_bag_$(i)")
     end
     
     # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
@@ -285,12 +290,17 @@ function price_lp(pi_bar, w, W, J, E, S; verbose=3, epsilon=1e-4)
 end
 
 "Runs pricing linear programming, but constrains new lambda to be integer"
-function int_price_lp(pi_bar, w, W, J, E, S; verbose=3, epsilon=1e-4)
+function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     price = Model(GLPK.Optimizer)
     @variable(price, 1 >= x[1:length(J)] >= 0)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
+    end
+
+    # cut forbidden bags
+    for (i, q) in enumerate(forbidden_bags)
+        @constraint(price, sum([q[j]*x[j] + (1-q[j])*(1-x[j]) for j in J]) <= length(J) - 1, base_name="forbidden_bag_$(i)")
     end
     
     # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
@@ -322,7 +332,7 @@ function int_price_lp(pi_bar, w, W, J, E, S; verbose=3, epsilon=1e-4)
     return p_obj, q
 end
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, max_iter=10e2, epsilon=1e-4)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4)
     
     m_obj = Inf
 
@@ -342,7 +352,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len; verbose=3, m
         m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, verbose=verbose)
         
         # run price lp
-        p_obj, q = price_function(pi_bar, w, W, J, E, S, verbose=verbose, epsilon=epsilon)
+        p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
 
         if p_obj < -epsilon
 
@@ -436,7 +446,22 @@ function solve_bpc(
     base_item_adress = Int64[j for j in J]
     
     # initialize node list
-    nodes = Node[Node(1, 0, J, E, w, W, Float32[], Int64[-1 for q in S], base_item_adress, false, deepcopy(bounds), 0, Array{Int64}[])]
+    nodes = Node[Node(
+        1, # id
+        0, # priority
+        J, 
+        E, 
+        w, 
+        W, 
+        Array{Float32}[], # S
+        Array{Int64}[], # mandatory_bags
+        0, # mandatory_bag_amount
+        Array{Int64}[], # forbidden_bags
+        Int64[j for j in J], # item_address
+        false, # interval_graph
+        deepcopy(bounds), # node bounds
+        Array{Int64}[], # solution
+    )]
     queue = Int64[1]
     
     best_node = Int64[1]
@@ -465,6 +490,8 @@ function solve_bpc(
         node = nodes[next_node_id]
         J, E, w, W, S, bounds = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
+
+        
 
         ## first try solving the node with heuristics and bounds' properties
 
@@ -587,7 +614,7 @@ function solve_bpc(
         # run column generation with specialized pricing
 
         # run column generation with integer pricing
-        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
         if termination_status(node.master) == OPTIMAL
             
             # get solution values
@@ -627,7 +654,7 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len)
+        z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len, forbidden_bags)
         if termination_status(node.master) != OPTIMAL
             break
         end
