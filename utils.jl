@@ -48,12 +48,6 @@ function get_compatible_items(bag, J, bag_conflicts, w, slack)
     return Int64[i for i in J if i ∉ bag_conflicts && slack - w[i] >= 0]
 end
 
-"transforms solution structure from binary, same length arrays to integer, variable length arrays"
-function get_pretty_solution(bags, bags_amount, J)
-    # clean_bags = [[bags[i][j] for j in 1:bags_sizes[i]] for i in 1:bags_amount]
-    return Array{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
-end
-
 "Utility to find most fractional item on a vector"
 function most_fractional_on_vector(v; epsilon=1e-4)
     bound_on = -1
@@ -218,8 +212,9 @@ function translate_edges(original_E, item_address)
     return unique(Array{Int64}[sort([item_address[e[1]], item_address[e[2]]]) for e in original_E])
 end
 
-"translates a solution, unmerging items"
-function translate_solution(node, solution; epsilon=1e-4)
+"translates a solution, unmerging items and adding mandatory bags"
+function translate_solution(node; epsilon=1e-4)
+
     translated_solution = Array{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
     address_items = Array{Int64}[Int64[0 for j in node.item_address] for i in node.J]
@@ -229,7 +224,7 @@ function translate_solution(node, solution; epsilon=1e-4)
     end
 
 
-    for (i, bag) in enumerate(solution)
+    for (i, bag) in enumerate(node.solution)
         for (address, is_here) in enumerate(bag)
 
             if is_here > epsilon
@@ -238,7 +233,15 @@ function translate_solution(node, solution; epsilon=1e-4)
         end
     end
 
+    # add the mandatory_bags
+    translated_solution = vcat(translated_solution, node.mandatory_bags)
+
     return translated_solution
+end
+
+"transforms solution structure from binary, same length arrays to integer, variable length arrays"
+function get_pretty_solution(bags, bags_amount; epsilon=1e-4)
+    return Array{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
 end
 
 get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]

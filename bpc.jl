@@ -388,15 +388,19 @@ end
 
     0: node not done;
     1: node done;
-    2: global done;
+    2: UB = LB;
 """
-function update_bounds_status(node, bounds, best_node; verbose=1)
+function update_bounds_status(node, bounds, best_node, nodes, queue; verbose=1)
 
+    # update global lower bound
+    bounds[1], _ = findmin(x -> nodes[x].bounds[1], vcat(queue, best_node))
+
+    # default status (continue processing node)
     status = 0
     
     if node.bounds[2] < bounds[2] # is there a new best solution?
         bounds[2] = node.bounds[2]
-        best_node = node.id
+        best_node[1] = node.id
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
@@ -440,6 +444,22 @@ function solve_bpc(
     # Start the tree
     while !(isempty(queue))
 
+        # for all nodes except the first, check if there is a point in processing it (prune the tree)
+        if queue[1] != 1
+
+            # update bounds status
+            bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+            if bound_status != 0 # is it a global or local optimal?
+                if bound_status == 1 # local optimal
+                    # prune the tree
+                    continue
+                else # global optimal
+                    break
+                    # return ffd_solution, bounds[2]
+                end
+            end
+        end
+
         # get next node
         next_node_id = splice!(queue, 1)
         node = nodes[next_node_id]
@@ -451,6 +471,7 @@ function solve_bpc(
         # naive solution (one item per bag)
         naive_solution = get_naive_solution(J)
         node.bounds[2] = item_amount
+        node.solution = naive_solution
 
         verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
 
@@ -459,7 +480,7 @@ function solve_bpc(
         verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
 
         # update bounds status
-        bound_status = update_bounds_status(node, bounds, best_node, verbose=verbose)
+        bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
         if bound_status != 0 # is it a global or local optimal?
             if bound_status == 1 # local optimal
                 # prune the tree
@@ -477,15 +498,17 @@ function solve_bpc(
             # if a better solution than one item per bag was found 
             if ffd_upper_bound < node.bounds[2]
                 node.bounds[2] = ffd_upper_bound
+                node.solution = ffd_solution
                 
                 # update bounds status
-                bound_status = update_bounds_status(node, bounds, best_node, verbose=verbose)
+                bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
                 if bound_status != 0 # is it a global or local optimal?
                     if bound_status == 1 # local optimal
                         # prune the tree
                         continue
                     else # global optimal
-                        return ffd_solution, bounds[2]
+                        break
+                        # return ffd_solution, bounds[2]
                     end
                 end   
             end
@@ -504,13 +527,14 @@ function solve_bpc(
                 verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node_lb)")
 
                 # update bounds status
-                bound_status = update_bounds_status(node, bounds, best_node, verbose=verbose)
+                bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
                 if bound_status != 0 # is it a global or local optimal?
                     if bound_status == 1 # local optimal
                         # prune the tree
                         continue
                     else # global optimal
-                        return initial_solution, bounds[2]
+                        break
+                        # return initial_solution, bounds[2]
                     end
                 end    
             end
@@ -564,44 +588,53 @@ function solve_bpc(
 
         # run column generation with integer pricing
         m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, verbose=verbose, epsilon=epsilon, max_iter=1e2)
-    
-        # get solution values
-        lambda_bar = value.(lambdas)
-        x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
-    
-        # treat current solution
-        current_solution = round_up_solution(x_bar)
-        current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
-        
-        verbose >= 1 && println("Integer CGA upper bound: $(cga_ub)")
-    
-        # was there an improvement from the heuristic?
-        if cga_ub < node.bounds[2]
-    
-            node.bounds[2] = cga_ub
-            best_solution = deepcopy(current_solution)
+        if termination_status(node.master) == OPTIMAL
             
-            # update bounds status
-            bound_status = update_bounds_status(node, bounds, best_node, verbose=verbose)
-            if bound_status != 0 # is it a global or local optimal?
-                if bound_status == 1 # local optimal
-                    # prune the tree
-                    continue
-                else # global optimal
-                    return best_solution, bounds[2]
-                end
-            end  
+            # get solution values
+            lambda_bar = value.(lambdas)
+            x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
+        
+            # treat current solution
+            current_solution = round_up_solution(x_bar)
+            current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
+            
+            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub)")
+        
+            # was there an improvement from the heuristic?
+            if cga_ub < node.bounds[2]
+        
+                node.bounds[2] = cga_ub
+                best_solution = deepcopy(current_solution)
+                node.solution = best_solution
+                
+                # update bounds status
+                bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+                if bound_status != 0 # is it a global or local optimal?
+                    if bound_status == 1 # local optimal
+                        # prune the tree
+                        continue
+                    else # global optimal
+                        break
+                        # return best_solution, bounds[2]
+                    end
+                end  
+            end
+        
         end
+
 
 
         ## BCPA
 
         # apply cga
         z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len)
+        if termination_status(node.master) != OPTIMAL
+            break
+        end
 
         # is there already a better or equal solution?
         if cga_lb >= bounds[2]
-            continue
+            continue # close node
         end
 
         if cga_lb > node.bounds[1]
@@ -610,7 +643,7 @@ function solve_bpc(
             node.bounds[1] = cga_lb
 
             # update bounds status
-            bound_status = update_bounds_status(node, bounds, best_node, verbose=verbose)
+            bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
             if bound_status != 0 # is it a global or local optimal?
                 if bound_status == 1 # local optimal
                     # prune the tree
@@ -658,7 +691,7 @@ function solve_bpc(
         else # the solution is integer!
 
             # update bounds status
-            bound_status = update_bounds_status(node, bounds, best_node, verbose=verbose)
+            bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
             if bound_status != 0 # is it a global or local optimal?
                 if bound_status == 1 # local optimal
                     # prune the tree
@@ -670,27 +703,9 @@ function solve_bpc(
     end
     
     verbose >= 1 && println("tree finished")
-
-
-
     
+    solution = translate_solution(nodes[best_node[1]], epsilon=epsilon)
+    final_solution = get_pretty_solution(solution, bounds[2])
 
-    lambda_bar = value.(lambdas)
-    println([i for i in lambda_bar if i > epsilon])
-
-    solution = Array{Float32}[]
-    for i in 1:length(lambda_bar)
-        if lambda_bar[i] > epsilon
-            println("lambda $(i): $(lambda_bar[i]) -> $(S[i])")
-            push!(solution, lambda_bar[i]*S[i])
-        end
-    end
-
-    
-    solution = get_pretty_solution(solution, 5, J)
-
-    return solution, bounds[2]
-
-
-    return false, false
+    return final_solution, bounds[2]
 end
