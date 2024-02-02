@@ -59,25 +59,33 @@ function merge_items(i, j, J, w, E, item_address)
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node)
+function make_child_node_with_rf_branch(node::Node, i, j, q)
+    
+    items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
 
-    child = deepcopy(node)
-    J, E, w, W, S, bounds = get_node_parameters(child)
+    
+    # get largest item in bag, except the fractional item
+    weight, i = findmax(x -> w[x], Int64[i for i in items_in_q if i != j])
 
-    # get largest item in bag and the fractional item to bound on
-
-
-    weight_i, i = heaviest_in_address([1], item_address, w)
-    weight_j, j = heaviest_in_address([2], item_address, w)
 
     # merge branch
-    new_J, new_w = merge_items(i, j, J, w, E, item_address)
+    if weight + w[j] < node.W
+        pos_child = deepcopy(node)
+
+        # make child
+        J, E, w, W, S, bounds = get_node_parameters(pos_child)
+        pos_child.J, pos_child.w, pos_child.E = merge_items(i, j, J, w, E, item_address)
+
+
+    end
+
 
     # split branch
-    push!(E, sort([i,j]))
+    neg_child = deepcopy(node)
+    push!(neg_child.E, sort([i,j]))
 
 
-    return child
+    return pos_child, neg_child
 end
 
 "removes items in q from J and E, updating addresses as necessary"
@@ -627,6 +635,11 @@ function solve_bpc(
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
+
+            q = S[most_fractional_item[1]]
+            j = most_fractional_item[2]
+
+
 
             make_child_node_with_rf_branch
 

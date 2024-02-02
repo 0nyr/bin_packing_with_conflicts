@@ -83,7 +83,8 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
         for (j, x_j) in enumerate(S[q])
             is_bag_integer = true
 
-            d = lambda_bar[q]*x_j
+            # d = lambda_bar[q]*x_j
+            d = x_j
             diff = d - floor(d)
             
             if diff > epsilon && diff < 1-epsilon
