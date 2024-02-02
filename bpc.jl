@@ -59,24 +59,31 @@ function merge_items(i, j, J, w, E, item_address)
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, i, j, q)
+function make_child_node_with_rf_branch(node::Node, j, q)
     
-    items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
+    # variable length representation
+    items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] 
 
+    # get items that can be merged with j
+    available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < node.W]
     
-    # get largest item in bag, except the fractional item
-    weight, i = findmax(x -> w[x], Int64[i for i in items_in_q if i != j])
-
-
+    
     # merge branch
-    if weight + w[j] < node.W
-        pos_child = deepcopy(node)
+    if !(isempty(available_to_merge))
+
+        # get largest item in bag, except the fractional item
+        _, i = findmax(x -> w[x], available_to_merge)
+    
 
         # make child
+        pos_child = deepcopy(node)
+
+        # update graph
         J, E, w, W, S, bounds = get_node_parameters(pos_child)
         pos_child.J, pos_child.w, pos_child.E = merge_items(i, j, J, w, E, item_address)
 
-
+    else
+        pos_child = nothing
     end
 
 
@@ -641,9 +648,11 @@ function solve_bpc(
 
 
 
-            make_child_node_with_rf_branch
+            pos_child, neg_child = make_child_node_with_rf_branch(node, j, q)
 
-            register_node(pos_child, nodes, queue)
+            if !(isnothing(pos_child))
+                register_node(pos_child, nodes, queue)
+            end
             register_node(neg_child, nodes, queue)
         
         else # the solution is integer!
