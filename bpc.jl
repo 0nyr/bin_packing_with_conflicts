@@ -27,7 +27,7 @@ end
 get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S, node.branches
 
 "merges two items i and j, merging conflicts, summing their weights"
-function merge_items(i, j, J, w, E, item_address)
+function merge_items(i, j, J, w, E_original, item_address)
     
     # first, make sure i is the lesser value
     i, j = sort([i,j])
@@ -53,7 +53,7 @@ function merge_items(i, j, J, w, E, item_address)
     end
 
     # translate edges
-    new_E = translate_edges(E, item_address)
+    new_E = translate_edges(E_original, item_address)
 
     return new_J, new_w, new_E
 end
@@ -96,7 +96,7 @@ function make_child_node_with_rf_branch(node::Node, j, q)
 end
 
 "removes items in q from J and E, updating addresses as necessary"
-function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
+function remove_from_graph(q, q_on_original_G, J, E_original, w, item_address)
 
     items_amount = length(J)
     amount_to_remove = length(q)
@@ -121,7 +121,9 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     end
 
     # remove edges containing removed items
-    new_E = [e for e in E if !(e[1] ∈ q) && !(e[2] ∈ q)]
+    new_E = [e for e in E_original if !(e[1] ∈ q_on_original_G) && !(e[2] ∈ q_on_original_G)]
+
+    # translate edges
 
     # update weights
     for (j, address) in item_address
