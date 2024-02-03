@@ -548,7 +548,7 @@ function solve_bpc(
 
         # FFD heuristic for initial solution and upper bound
         if run_ffd
-            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, E, verbose=verbose>1)
+            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, translated_E, verbose=verbose>1)
 
             # remove forbidden bags from ffd solution
             ffd_solution_is_good = remove_forbidden_bags(ffd_solution, forbidden_bags)
@@ -657,7 +657,7 @@ function solve_bpc(
         # run column generation with specialized pricing
 
         # run column generation with integer pricing
-        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
         if termination_status(node.master) == OPTIMAL
             
             # get solution values
@@ -697,7 +697,7 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, E, lambdas, node.S, node.S_len, forbidden_bags)
+        z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, translated_E, lambdas, node.S, node.S_len, forbidden_bags)
         if termination_status(node.master) != OPTIMAL
             break
         end

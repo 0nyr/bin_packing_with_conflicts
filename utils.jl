@@ -231,7 +231,7 @@ function remove_forbidden_bags(solution::Array{Array{Int64}}, forbidden_bags::Ar
     return original_length == length(solution)
 end
 
-"translate edges for new address"
+"translate edges for new address. removes duplicates and edges involving items in mandatory bags"
 function translate_edges(original_E, item_address)
     return unique(Array{Int64}[
         sort([item_address[e[1]], item_address[e[2]]]) for e in original_E 
