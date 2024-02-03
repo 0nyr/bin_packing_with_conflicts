@@ -59,7 +59,7 @@ function merge_items(i, j, J, w, E_original, item_address)
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j, q)
+function make_child_node_with_rf_branch(node::Node, j, q, nodes)
     
     # variable length representation
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] 
@@ -80,7 +80,7 @@ function make_child_node_with_rf_branch(node::Node, j, q)
 
         # update graph
         J, E, w, W, S, bounds = get_node_parameters(pos_child)
-        pos_child.J, pos_child.w, pos_child.E = merge_items(i, j, J, w, E, item_address)
+        pos_child.J, pos_child.w, pos_child.E = merge_items(i, j, J, w, nodes[1].E, item_address)
 
     else
         pos_child = nothing
@@ -93,6 +93,15 @@ function make_child_node_with_rf_branch(node::Node, j, q)
 
 
     return pos_child, neg_child
+end
+
+function update_E_with_merge(E, i, j)
+    new_E = filter(e -> (i ∈ e || j ∈ e), E)
+    for (k, e) in enumerate(E)
+        if i ∈ e || j ∈ e
+
+        end
+    end
 end
 
 "removes items in q from J and E, updating addresses as necessary"
@@ -134,7 +143,7 @@ function remove_from_graph(q, q_on_original_G, J, E_original, w, item_address)
 end
 
 "makes children with bag branching"
-function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
+function make_child_node_with_bag_branch(node::Node, q::Array{Float32}, nodes)
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
@@ -157,7 +166,7 @@ function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
     push!(pos_child.mandatory_bags, q_on_original_G)
 
     # remove the items in the mandatory bag from the graph
-    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, w, pos_child.item_address)
+    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, nodes[1].E, w, pos_child.item_address)
 
 
     # get negative child (variable to branch on <= 0)
@@ -722,7 +731,7 @@ function solve_bpc(
             # get q to branch on
             q = S[most_fractional_bag]
 
-            pos_child, neg_child = make_child_node_with_bag_branch(node, q)
+            pos_child, neg_child = make_child_node_with_bag_branch(node, q, nodes)
 
             register_node(pos_child, nodes, queue)
             register_node(neg_child, nodes, queue)
@@ -735,7 +744,7 @@ function solve_bpc(
 
 
 
-            pos_child, neg_child = make_child_node_with_rf_branch(node, j, q)
+            pos_child, neg_child = make_child_node_with_rf_branch(node, j, q, nodes)
 
             if !(isnothing(pos_child))
                 register_node(pos_child, nodes, queue)
