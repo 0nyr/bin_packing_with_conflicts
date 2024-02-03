@@ -2,8 +2,8 @@ using JuMP
 using GLPK
 using LinearAlgebra
 
-"return set of items found in a set of addresses"
-function get_items_in_address(addresses, item_address)
+"Returns set of items found in a set of addresses"
+function unmerge_bag_items(addresses, item_address)
     
     items = Int64[]
     for (j, address) in enumerate(item_address)
@@ -14,8 +14,19 @@ function get_items_in_address(addresses, item_address)
     return items
 end
 
+"Translate a bag to account for mergings (returns binarized)"
+function merge_bag_items(bag, item_address, J)
+    merged = Int64[0 for j in J]
+    for j in bag
+        merged[item_address[j]] = 1
+    end
+
+    return merged
+end
+
+
 "returns item and weight of heaviest item in a set of addresses"
-heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], get_items_in_address(addresses, item_address))
+heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], unmerge_bag_items(addresses, item_address))
 
 function get_edges(J, E)    
     edges = Array{Int64}[Int64[] for i in J]
@@ -205,6 +216,16 @@ function get_naive_solution(J)
         naive_solution[i][i] = 1
     end
     return naive_solution
+end
+
+"remove forbidden bags from a solution. Returns true if bags were removed"
+function remove_forbidden_bags(solution::Array{Array{Int64}}, forbidden_bags::Array{Array{Int64}})
+
+    original_length = length(solution)
+
+    filter!(x -> !(x ∈ forbidden_bags_binary), solution)
+
+    return original_length == length(solution)
 end
 
 "translate edges for new address"
