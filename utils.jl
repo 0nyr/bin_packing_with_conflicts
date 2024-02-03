@@ -32,7 +32,7 @@ heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], unmerge_bag
 lightest_in_address(addresses, item_address, w) = findmin(x -> w[x], unmerge_bag_items(addresses, item_address))
 
 function get_edges(J, E)    
-    edges = Array{Int64}[Int64[] for i in J]
+    edges = Vector{Int64}[Int64[] for i in J]
     for i in J
         for edge in E
             if i == edge[1]
@@ -128,7 +128,7 @@ end
 
 "returns {i | λ_i > 0 ∀ i}"
 function get_bags_in_use(lambda_bar, S, S_len, J; epsilon=1e-4)
-    # bags = Array{Float32}[Float32[0.0 for j in J] for i in J]
+    # bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
     bags_in_use = Int64[]
 
     # get bags selected for use
@@ -143,7 +143,7 @@ end
 
 "from lambda, returns x"
 function get_x(lambda_bar, S, S_len, J; epsilon=1e-4)
-    bags = Array{Float32}[Float32[0.0 for j in J] for i in J]
+    bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
 
     # get bags selected for use
     bag_amount = 0
@@ -162,7 +162,7 @@ floor_vector(q; epsilon=1e-4) = floor.(q .+ epsilon)
 ceil_vector(q; epsilon=1e-4) = ceil.(q .- epsilon)
 
 "rounds up the solution bags, converting to integer"
-round_up_solution(solution; epsilon=1e-4) = Array{Int64}[Int64.(ceil_vector(bag, epsilon=epsilon)) for bag in solution]
+round_up_solution(solution; epsilon=1e-4) = Vector{Int64}[Int64.(ceil_vector(bag, epsilon=epsilon)) for bag in solution]
 
 "Prunes the excess items, prioritizing the most heavy bags"
 function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
@@ -183,7 +183,7 @@ function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
     
     # get location of all excesses
     bag_i = 0
-    item_locations = Array{Int64}[[] for j in J]
+    item_locations = Vector{Int64}[[] for j in J]
     for bag in solution
         bag_i += 1
 
@@ -214,7 +214,7 @@ end
 
 "Naive solution, one item per bag"
 function get_naive_solution(J)
-    naive_solution = Array{Int64}[Int64[0 for j in J] for i in J]
+    naive_solution = Vector{Int64}[Int64[0 for j in J] for i in J]
     for i in J # one item per bag
         naive_solution[i][i] = 1
     end
@@ -222,7 +222,7 @@ function get_naive_solution(J)
 end
 
 "remove forbidden bags from a solution. Returns true if bags were removed"
-function remove_forbidden_bags(solution::Array{Array{Int64}}, forbidden_bags::Array{Array{Int64}})
+function remove_forbidden_bags(solution::Vector{Vector{Int64}}, forbidden_bags::Vector{Vector{Int64}})
 
     original_length = length(solution)
 
@@ -233,18 +233,19 @@ end
 
 "translate edges for new address. removes duplicates and edges involving items in mandatory bags"
 function translate_edges(original_E, item_address)
-    return unique(Array{Int64}[
+    return unique(Vector{Int64}[
         sort([item_address[e[1]], item_address[e[2]]]) for e in original_E 
         if item_address[e[1]] != 0 && item_address[e[1]] != 0 && item_address[e[1]] != item_address[e[2]] 
     ]) 
+end
  
 
 "translates a solution, unmerging items and adding mandatory bags"
 function translate_solution(node; epsilon=1e-4)
 
-    translated_solution = Array{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
+    translated_solution = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
-    address_items = Array{Int64}[Int64[0 for j in node.item_address] for i in node.J]
+    address_items = Vector{Int64}[Int64[0 for j in node.item_address] for i in node.J]
 
     for (j, address) in enumerate(node.item_address) 
         address_items[address][j] = 1
@@ -268,7 +269,7 @@ end
 
 "transforms solution structure from binary, same length arrays to integer, variable length arrays"
 function get_pretty_solution(bags, bags_amount; epsilon=1e-4)
-    return Array{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
+    return Vector{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
 end
 
 get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]

@@ -8,23 +8,23 @@ include("utils.jl")
 mutable struct Node
     id::Int64
     priority::Int64 
-    J::Array{Int64}
-    E::Array{Array{Int64}}
-    w::Array{Int64}
+    J::Vector{Int64}
+    E::Vector{Vector{Int64}}
+    w::Vector{Int64}
     W::Int64
-    S::Array{Array{Float32}} # needs to be pruned after a Ryan-Foster merge!
-    mandatory_bags::Array{Array{Int64}} # mandatory q ∈ S
+    S::Vector{Vector{Float32}} # needs to be pruned after a Ryan-Foster merge!
+    mandatory_bags::Vector{Vector{Int64}} # mandatory q ∈ S
     mandatory_bag_amount::Int64
-    forbidden_bags::Array{Array{Int64}} # forbidden q ∈ S
-    # lambdas::Array{VariableRef}
-    item_address::Array{Array{Int64}}
+    forbidden_bags::Vector{Vector{Int64}} # forbidden q ∈ S
+    item_address::Vector{Int64}
     interval_graph::Bool # can DP-flow be used? 
-    bounds::Array{Int64} # [lower_bound, upper_bound]
-    solution::Array{Array{Int64}}
+    bounds::Vector{Int64} # [lower_bound, upper_bound]
+    solution::Vector{Vector{Int64}}
 end
 
+
 "node parameters getter"
-get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S, node.branches
+get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S
 
 "merges two items i and j, merging conflicts, summing their weights"
 function merge_items(i, j, J, w, item_address)
@@ -75,7 +75,7 @@ function make_child_node_with_rf_branch(node::Node, j, q)
         pos_child = deepcopy(node)
     
         # update graph
-        J, E, w, W, S, bounds = get_node_parameters(pos_child)
+        J, E, w, W, S = get_node_parameters(pos_child)
         pos_child.J, pos_child.w = merge_items(i, j, J, w, item_address)
         
         
@@ -147,13 +147,13 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 end
 
 "makes children with bag branching"
-function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
+function make_child_node_with_bag_branch(node::Node, q::Vector{Float32})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
     
     # who lives at address j?
-    # items_in_address = Array{Int64}[Int64[] for j in J]
+    # items_in_address = Vector{Int64}[Int64[] for j in J]
     # for (j, address) in enumerate(item_address)
     #     if address > 0
     #         push!(items_in_address[address], j)
@@ -163,7 +163,7 @@ function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
     # get positive child (variable to branch on >= 1) 
     # the items in mandatory bags (λ >= 1) are *removed* from the graph and only considered when computing bounds
     pos_child = deepcopy(node)
-    J, E, w, W, S, bounds = get_node_parameters(pos_child)
+    J, E, w, W, S = get_node_parameters(pos_child)
     
     # add bag to mandatory set
     push!(pos_child.mandatory_bags, q_on_original_G)
@@ -216,11 +216,11 @@ end
 
 "apply First Fit Decreasing heuristic considering conflicts"
 function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
-    bags = Array{Int64}[Int64[0 for j in J] for i in J]
-    # bags = Array{Bool}[Bool[0 for j in J] for i in J]
+    bags = Vector{Int64}[Int64[0 for j in J] for i in J]
+    # bags = Vector{Bool}[Bool[0 for j in J] for i in J]
     bags_sizes = Int64[0 for i in J]
     bags_slacks = Int64[W for i in J]
-    bags_conflicts = Array{Bool}[Bool[0 for j in J] for i in J]
+    bags_conflicts = Vector{Bool}[Bool[0 for j in J] for i in J]
 
     J = sort(J, rev=true, by=(x)->w[x])
 
@@ -445,9 +445,9 @@ function update_bounds_status(node, bounds, best_node, nodes, queue; verbose=1)
 end
 
 function solve_bpc(
-    J::Array{Int64}, 
-    E::Array{Int64, Int64}, 
-    w::Array{Int64}, 
+    J::Vector{Int64}, 
+    E::Vector{Vector{Int64}}, 
+    w::Vector{Int64}, 
     W::Int64; 
     verbose::Int64=1, 
     run_ffd::Bool=true, 
@@ -457,7 +457,7 @@ function solve_bpc(
     item_amount = length(J)
 
     # [LB, UB]
-    bounds = [1, item_amount+1]
+    bounds = Int64[1, item_amount+1]
 
     # where can item j be found? (for merging items)
     base_item_adress = Int64[j for j in J]
@@ -470,14 +470,14 @@ function solve_bpc(
         E, 
         w, 
         W, 
-        Array{Float32}[], # S
-        Array{Int64}[], # mandatory_bags
+        Vector{Float32}[], # S
+        Vector{Int64}[], # mandatory_bags
         0, # mandatory_bag_amount
-        Array{Int64}[], # forbidden_bags
+        Vector{Int64}[], # forbidden_bags
         Int64[j for j in J], # item_address
         false, # interval_graph
         deepcopy(bounds), # node bounds
-        Array{Int64}[], # solution
+        Vector{Int64}[], # solution
     )]
     queue = Int64[1]
     
@@ -504,15 +504,15 @@ function solve_bpc(
         # get next node
         next_node_id = splice!(queue, 1)
         node = nodes[next_node_id]
-        J, E, w, W, S, bounds = get_node_parameters(node)
+        J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
         # get translated edges
         translated_E = translate_edges(E, node.item_address)
 
         # get translated mandatory/forbidden bags
-        forbidden_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
-        # mandatory_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.mandatory_bags]
+        forbidden_bags = Vector{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
+        # mandatory_bags = Vector{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.mandatory_bags]
 
 
         ## first try solving the node with heuristics and bounds' properties
@@ -532,7 +532,7 @@ function solve_bpc(
     
             # get initial lower bound ( ⌈∑w/W⌉ ) 
             node.bounds[1] = get_simple_lower_bound(w, W)
-            verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
+            verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node.bounds[1])")
     
             # update bounds status
             bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
@@ -581,7 +581,7 @@ function solve_bpc(
             initial_solution = deepcopy(naive_solution)
 
         else # no solution
-            initial_solution = Array{Int64}[]
+            initial_solution = Vector{Int64}[]
         
         end
         
@@ -617,7 +617,7 @@ function solve_bpc(
         set_silent(master)
         
         # add the naive solution as lambda variables (can serve as artificial variables)
-        S = Array{Float32}[q for q in naive_solution]
+        S = Vector{Float32}[q for q in naive_solution]
 
         # if FFD was ran pass the relevant bags to S
         if run_ffd
