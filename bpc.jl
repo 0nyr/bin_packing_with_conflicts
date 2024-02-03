@@ -27,7 +27,7 @@ end
 get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S, node.branches
 
 "merges two items i and j, merging conflicts, summing their weights"
-function merge_items(i, j, J, w, E_original, item_address)
+function merge_items(i, j, J, w, item_address)
     
     # first, make sure i is the lesser value
     i, j = sort([i,j])
@@ -52,14 +52,11 @@ function merge_items(i, j, J, w, E_original, item_address)
         new_w[item_address[k]] += w[k]
     end
 
-    # translate edges
-    new_E = translate_edges(E_original, item_address)
-
-    return new_J, new_w, new_E
+    return new_J, new_w
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j, q, nodes)
+function make_child_node_with_rf_branch(node::Node, j, q)
     
     # variable length representation
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] 
@@ -68,48 +65,55 @@ function make_child_node_with_rf_branch(node::Node, j, q, nodes)
     available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < node.W]
     
     
-    # merge branch
+    # is there an item such that merging with j is feasible? (w_i + w_j < W) 
     if !(isempty(available_to_merge))
-
+        
         # get largest item in bag, except the fractional item
         _, i = findmax(x -> w[x], available_to_merge)
-    
-
+        
         # make child
         pos_child = deepcopy(node)
-
+    
         # update graph
         J, E, w, W, S, bounds = get_node_parameters(pos_child)
-        pos_child.J, pos_child.w, pos_child.E = merge_items(i, j, J, w, nodes[1].E, item_address)
+        pos_child.J, pos_child.w = merge_items(i, j, J, w, item_address)
+        
+        
+    else # merging is infeasible, only create negative child, with lighest i (higher probability of being in the same bag) 
 
-    else
+        # get the lighest i | i != j
+        i_weight = Inf
+        lighest_i = -1
+        for i in items_in_q
+            if node.w[i] < i_weight && i != j
+                i_weight = node.w[i]
+                lighest_i = i 
+            end
+        end
+        i = lighest_i
+
         pos_child = nothing
     end
 
-
     # split branch
     neg_child = deepcopy(node)
-    push!(neg_child.E, sort([i,j]))
 
+    # E stores in original graph
+    i = unmerge_bag_items([i], node.item_address)[1]
+    j = unmerge_bag_items([j], node.item_address)[1]
+
+    push!(neg_child.E, sort([i,j]))
 
     return pos_child, neg_child
 end
 
-function update_E_with_merge(E, i, j)
-    new_E = filter(e -> (i ∈ e || j ∈ e), E)
-    for (k, e) in enumerate(E)
-        if i ∈ e || j ∈ e
-
-        end
-    end
-end
-
 "removes items in q from J and E, updating addresses as necessary"
-function remove_from_graph(q, q_on_original_G, J, E_original, w, item_address)
+function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 
     items_amount = length(J)
     amount_to_remove = length(q)
 
+    # 
     new_J = Int64[j for j in 1:items_amount-amount_to_remove]
     new_w = Int64[0 for j in new_J]
         
@@ -130,7 +134,7 @@ function remove_from_graph(q, q_on_original_G, J, E_original, w, item_address)
     end
 
     # remove edges containing removed items
-    new_E = [e for e in E_original if !(e[1] ∈ q_on_original_G) && !(e[2] ∈ q_on_original_G)]
+    new_E = [e for e in E if !(e[1] ∈ q_on_original_G) && !(e[2] ∈ q_on_original_G)]
 
     # translate edges
 
@@ -143,7 +147,7 @@ function remove_from_graph(q, q_on_original_G, J, E_original, w, item_address)
 end
 
 "makes children with bag branching"
-function make_child_node_with_bag_branch(node::Node, q::Array{Float32}, nodes)
+function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
@@ -156,7 +160,6 @@ function make_child_node_with_bag_branch(node::Node, q::Array{Float32}, nodes)
     #     end
     # end
 
-    
     # get positive child (variable to branch on >= 1) 
     # the items in mandatory bags (λ >= 1) are *removed* from the graph and only considered when computing bounds
     pos_child = deepcopy(node)
@@ -166,7 +169,7 @@ function make_child_node_with_bag_branch(node::Node, q::Array{Float32}, nodes)
     push!(pos_child.mandatory_bags, q_on_original_G)
 
     # remove the items in the mandatory bag from the graph
-    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, nodes[1].E, w, pos_child.item_address)
+    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, w, pos_child.item_address)
 
 
     # get negative child (variable to branch on <= 0)
@@ -242,6 +245,7 @@ function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
             # if item fits and there is no conflict
             if bag_slack - item_weight >= 0 && !(bags_conflicts[bag_number][item_i]) 
                 verbose && println(" at bag $(bag_number)")
+
                 # add item to bag
                 bag_size += 1
                 # bags[bag_number][bag_size] = item_i
@@ -503,6 +507,9 @@ function solve_bpc(
         J, E, w, W, S, bounds = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
+        # get translated edges
+        translated_E = translate_edges(E, node.item_address)
+
         # get translated mandatory/forbidden bags
         forbidden_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
         # mandatory_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.mandatory_bags]
@@ -731,7 +738,7 @@ function solve_bpc(
             # get q to branch on
             q = S[most_fractional_bag]
 
-            pos_child, neg_child = make_child_node_with_bag_branch(node, q, nodes)
+            pos_child, neg_child = make_child_node_with_bag_branch(node, q)
 
             register_node(pos_child, nodes, queue)
             register_node(neg_child, nodes, queue)
@@ -744,7 +751,7 @@ function solve_bpc(
 
 
 
-            pos_child, neg_child = make_child_node_with_rf_branch(node, j, q, nodes)
+            pos_child, neg_child = make_child_node_with_rf_branch(node, j, q)
 
             if !(isnothing(pos_child))
                 register_node(pos_child, nodes, queue)

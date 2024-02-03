@@ -28,6 +28,9 @@ end
 "returns item and weight of heaviest item in a set of addresses"
 heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], unmerge_bag_items(addresses, item_address))
 
+"returns item and weight of lightest item in a set of addresses"
+lightest_in_address(addresses, item_address, w) = findmin(x -> w[x], unmerge_bag_items(addresses, item_address))
+
 function get_edges(J, E)    
     edges = Array{Int64}[Int64[] for i in J]
     for i in J
@@ -230,8 +233,11 @@ end
 
 "translate edges for new address"
 function translate_edges(original_E, item_address)
-    return unique(Array{Int64}[sort([item_address[e[1]], item_address[e[2]]]) for e in original_E])
-end
+    return unique(Array{Int64}[
+        sort([item_address[e[1]], item_address[e[2]]]) for e in original_E 
+        if item_address[e[1]] != 0 && item_address[e[1]] != 0 && item_address[e[1]] != item_address[e[2]] 
+    ]) 
+ 
 
 "translates a solution, unmerging items and adding mandatory bags"
 function translate_solution(node; epsilon=1e-4)
