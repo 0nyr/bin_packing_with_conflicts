@@ -188,6 +188,13 @@ end
 "adds new node to queue and node list"
 function register_node(node, nodes, queue)
 
+    # clear fields that need clearing
+    node.S = Vector{Float32}[]
+    node.solution = Vector{Int64}[]
+    node.mandatory_bag_amount = length(node.mandatory_bags)
+    node.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1
+    node.interval_graph = false # will need to check again
+
     # add new node to list
     push!(nodes, node)
     node.id = length(nodes)
@@ -525,13 +532,13 @@ function solve_bpc(
 
         if naive_solution_is_good
             
-            node.bounds[2] = item_amount
+            node.bounds[2] = item_amount + node.mandatory_bag_amount
             node.solution = naive_solution
     
             verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
     
             # get initial lower bound ( ⌈∑w/W⌉ ) 
-            node.bounds[1] = get_simple_lower_bound(w, W)
+            node.bounds[1] = get_simple_lower_bound(w, W) + node.mandatory_bag_amount
             verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node.bounds[1])")
     
             # update bounds status
@@ -559,7 +566,7 @@ function solve_bpc(
                 
                 # if a better solution than one item per bag was found 
                 if ffd_upper_bound < node.bounds[2]
-                    node.bounds[2] = ffd_upper_bound
+                    node.bounds[2] = ffd_upper_bound + node.mandatory_bag_amount
                     node.solution = ffd_solution
                     
                     # update bounds status
@@ -588,10 +595,10 @@ function solve_bpc(
         # try to improve lower bound with martello L2 lower bound
         for alpha in get_not_greater_than_half_capacity(w, W)
             lower_bound = get_l2_lower_bound(alpha, W, w)
-            if lower_bound > node.bounds[1]
+            if lower_bound + node.mandatory_bag_amount > node.bounds[1]
 
-                node.bounds[1] = lower_bound
-                verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node_lb)")
+                node.bounds[1] = lower_bound + mandatory_bag_amount
+                verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node.bounds[1])")
 
                 # update bounds status
                 bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
@@ -654,7 +661,9 @@ function solve_bpc(
         # show initial master
         verbose >= 2 && println(master)
     
+            
         # run column generation with specialized pricing
+        # if node.interval_graph...
 
         # run column generation with integer pricing
         m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
@@ -671,9 +680,9 @@ function solve_bpc(
             verbose >= 1 && println("Integer CGA upper bound: $(cga_ub)")
         
             # was there an improvement from the heuristic?
-            if cga_ub < node.bounds[2]
+            if cga_ub + node.mandatory_bag_amount < node.bounds[2]
         
-                node.bounds[2] = cga_ub
+                node.bounds[2] = cga_ub + node.mandatory_bag_amount
                 best_solution = deepcopy(current_solution)
                 node.solution = best_solution
                 
@@ -703,14 +712,14 @@ function solve_bpc(
         end
 
         # is there already a better or equal solution?
-        if cga_lb >= bounds[2]
+        if cga_lb + node.mandatory_bag_amount >= bounds[2]
             continue # close node
         end
 
-        if cga_lb > node.bounds[1]
+        if cga_lb + node.mandatory_bag_amount > node.bounds[1]
             verbose >= 1 && println("CGA lower bound: $(cga_lb)")
 
-            node.bounds[1] = cga_lb
+            node.bounds[1] = cga_lb + node.mandatory_bag_amount
 
             # update bounds status
             bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
