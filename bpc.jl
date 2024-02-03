@@ -137,7 +137,7 @@ end
 function make_child_node_with_bag_branch(node::Node, q::Array{Float32})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
-    q_on_original_G = get_items_in_address(q, node.item_address) # convert q to original G = (V, E), variable length
+    q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
     
     # who lives at address j?
     # items_in_address = Array{Int64}[Int64[] for j in J]
@@ -479,12 +479,11 @@ function solve_bpc(
             # update bounds status
             bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
             if bound_status != 0 # is it a global or local optimal?
-                if bound_status == 1 # local optimal
+                if bound_status == 1 # no need to continue
                     # prune the tree
                     continue
                 else # global optimal
                     break
-                    # return ffd_solution, bounds[2]
                 end
             end
         end
@@ -496,60 +495,78 @@ function solve_bpc(
         verbose >=1 && println("node $(node.id)")
 
         # get translated mandatory/forbidden bags
-        forbidden_bags = [get_items_in_address(bag, node.item_address) for bag in node.forbidden_bags]
-        # mandatory_bags = [get_items_in_address(bag, node.item_address) for bag in node.mandatory_bags]
+        forbidden_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
+        # mandatory_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.mandatory_bags]
 
 
         ## first try solving the node with heuristics and bounds' properties
 
         # naive solution (one item per bag)
         naive_solution = get_naive_solution(J)
-        node.bounds[2] = item_amount
-        node.solution = naive_solution
 
-        verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
+        # remove forbidden bags from naive solution
+        naive_solution_is_good = remove_forbidden_bags(naive_solution, forbidden_bags)
 
-        # get initial lower bound ( ⌈∑w/W⌉ ) 
-        node.bounds[1] = get_simple_lower_bound(w, W)
-        verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
-
-        # update bounds status
-        bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
-        if bound_status != 0 # is it a global or local optimal?
-            if bound_status == 1 # local optimal
-                # prune the tree
-                continue
-            else # global optimal
-                return naive_solution, bounds[2]
+        if naive_solution_is_good
+            
+            node.bounds[2] = item_amount
+            node.solution = naive_solution
+    
+            verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
+    
+            # get initial lower bound ( ⌈∑w/W⌉ ) 
+            node.bounds[1] = get_simple_lower_bound(w, W)
+            verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node_lb)")
+    
+            # update bounds status
+            bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+            if bound_status != 0 # is it a global or local optimal?
+                if bound_status == 1 # no need to continue
+                    # prune the tree
+                    continue
+                else # global optimal
+                    break
+                end
             end
         end
 
         # FFD heuristic for initial solution and upper bound
         if run_ffd
             ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, E, verbose=verbose>1)
-            verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
-            
-            # if a better solution than one item per bag was found 
-            if ffd_upper_bound < node.bounds[2]
-                node.bounds[2] = ffd_upper_bound
-                node.solution = ffd_solution
+
+            # remove forbidden bags from ffd solution
+            ffd_solution_is_good = remove_forbidden_bags(ffd_solution, forbidden_bags)
+
+            if ffd_solution_is_good
+
+                verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
                 
-                # update bounds status
-                bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
-                if bound_status != 0 # is it a global or local optimal?
-                    if bound_status == 1 # local optimal
-                        # prune the tree
-                        continue
-                    else # global optimal
-                        break
-                        # return ffd_solution, bounds[2]
-                    end
-                end   
+                # if a better solution than one item per bag was found 
+                if ffd_upper_bound < node.bounds[2]
+                    node.bounds[2] = ffd_upper_bound
+                    node.solution = ffd_solution
+                    
+                    # update bounds status
+                    bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+                    if bound_status != 0 # is it a global or local optimal?
+                        if bound_status == 1 # no need to continue
+                            # prune the tree
+                            continue
+                        else # global optimal
+                            break
+                        end
+                    end   
+                end
+
+                initial_solution = deepcopy(ffd_solution)
             end
     
-            initial_solution = deepcopy(ffd_solution)
-        else
+        elseif naive_solution_is_good
             initial_solution = deepcopy(naive_solution)
+
+        else # no solution
+            initial_solution = Array{Int64}[]
+        
         end
         
         # try to improve lower bound with martello L2 lower bound
@@ -563,12 +580,11 @@ function solve_bpc(
                 # update bounds status
                 bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
                 if bound_status != 0 # is it a global or local optimal?
-                    if bound_status == 1 # local optimal
+                    if bound_status == 1 # no need to continue
                         # prune the tree
                         continue
                     else # global optimal
                         break
-                        # return initial_solution, bounds[2]
                     end
                 end    
             end
@@ -584,7 +600,7 @@ function solve_bpc(
         master = Model(GLPK.Optimizer)
         set_silent(master)
         
-        # add the naive solution as lambda variables (will serve as artificial variables)
+        # add the naive solution as lambda variables (can serve as artificial variables)
         S = Array{Float32}[q for q in naive_solution]
 
         # if FFD was ran pass the relevant bags to S
@@ -599,21 +615,25 @@ function solve_bpc(
         S_len = length(S)
     
         # create lambda variables from existing q ∈ S
-        i = 1
         lambdas = VariableRef[]
         for q in S 
             var = @variable(master, lower_bound=0, base_name="λ_$(i)")
             push!(lambdas, var)
-            i+=1
         end
-    
-        # demand constraints
+        
+        # demand constraints and artificial variables
+        artificial_variables = VariableRef[]
         for i in J
-            @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
+            au = @variable(master, lower_bound=0, base_name="a_u_$(i)")
+            al = @variable(master, lower_bound=0, base_name="a_l_$(i)")
+
+            @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
+
+            push!(artificial_variables, au, al)
         end
     
         # objective function
-        @objective(master, Min, sum(lambdas))
+        @objective(master, Min, sum(lambdas) + 10*item_amount*sum(artificial_variables))
     
         # show initial master
         verbose >= 2 && println(master)
@@ -644,7 +664,7 @@ function solve_bpc(
                 # update bounds status
                 bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
                 if bound_status != 0 # is it a global or local optimal?
-                    if bound_status == 1 # local optimal
+                    if bound_status == 1 # no need to continue
                         # prune the tree
                         continue
                     else # global optimal
@@ -679,7 +699,7 @@ function solve_bpc(
             # update bounds status
             bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
             if bound_status != 0 # is it a global or local optimal?
-                if bound_status == 1 # local optimal
+                if bound_status == 1 # no need to continue
                     # prune the tree
                     continue
                 end
@@ -727,7 +747,7 @@ function solve_bpc(
             # update bounds status
             bound_status = update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
             if bound_status != 0 # is it a global or local optimal?
-                if bound_status == 1 # local optimal
+                if bound_status == 1 # no need to continue
                     # prune the tree
                     continue
                 end
