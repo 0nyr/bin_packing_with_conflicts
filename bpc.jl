@@ -493,7 +493,7 @@ function solve_bpc(
         verbose >=1 && println("node $(node.id)")
 
         # get translated mandatory/forbidden bags
-        forbidden_bags_binary = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
+        forbidden_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
         # mandatory_bags = Array{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.mandatory_bags]
 
 
@@ -503,7 +503,7 @@ function solve_bpc(
         naive_solution = get_naive_solution(J)
 
         # remove forbidden bags from naive solution
-        naive_solution_is_good = remove_forbidden_bags(naive_solution, forbidden_bags_binary)
+        naive_solution_is_good = remove_forbidden_bags(naive_solution, forbidden_bags)
 
         if naive_solution_is_good
             
@@ -533,7 +533,7 @@ function solve_bpc(
             ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, E, verbose=verbose>1)
 
             # remove forbidden bags from ffd solution
-            ffd_solution_is_good = remove_forbidden_bags(ffd_solution, forbidden_bags_binary)
+            ffd_solution_is_good = remove_forbidden_bags(ffd_solution, forbidden_bags)
 
             if ffd_solution_is_good
 
@@ -622,9 +622,9 @@ function solve_bpc(
         # demand constraints and artificial variables
         artificial_variables = VariableRef[]
         for i in J
-            au = @variable(master, lower_bound=0, base_name="au_$(i)")
-            al = @variable(master, lower_bound=0, base_name="al_$(i)")
-            
+            au = @variable(master, lower_bound=0, base_name="a_u_$(i)")
+            al = @variable(master, lower_bound=0, base_name="a_l_$(i)")
+
             @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
 
             push!(artificial_variables, au, al)

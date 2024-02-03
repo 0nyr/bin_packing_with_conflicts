@@ -223,7 +223,7 @@ function remove_forbidden_bags(solution::Array{Array{Int64}}, forbidden_bags::Ar
 
     original_length = length(solution)
 
-    filter!(x -> !(x ∈ forbidden_bags_binary), solution)
+    filter!(x -> !(x ∈ forbidden_bags), solution)
 
     return original_length == length(solution)
 end
