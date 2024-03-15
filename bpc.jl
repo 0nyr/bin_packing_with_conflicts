@@ -639,7 +639,7 @@ function solve_bpc(
     
         # create lambda variables from existing q ∈ S
         lambdas = VariableRef[]
-        for q in S 
+        for (i, q) in enumerate(S) 
             var = @variable(master, lower_bound=0, base_name="λ_$(i)")
             push!(lambdas, var)
         end
@@ -667,7 +667,7 @@ function solve_bpc(
 
         # run column generation with integer pricing
         m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
-        if termination_status(node.master) == OPTIMAL
+        if termination_status(master) == OPTIMAL
             
             # get solution values
             lambda_bar = value.(lambdas)
@@ -706,8 +706,8 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, node.S_len = cga(node.master, price_lp, w, W, J, translated_E, lambdas, node.S, node.S_len, forbidden_bags)
-        if termination_status(node.master) != OPTIMAL
+        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags)
+        if termination_status(master) != OPTIMAL
             break
         end
 
