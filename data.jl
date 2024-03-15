@@ -39,7 +39,7 @@ function read_file(filename)
         sort!(E)
     end
 
-    return J, w, E, W
+    return J, w, E, bin_size
 end
 
 function write_to_file(J, w, E, W, filepath)
