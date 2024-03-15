@@ -46,8 +46,11 @@ function write_to_file(J, w, E, W, filepath)
 
     conflicts = Vector{Int64}[Int64[] for i in J]
     for e in E
-        push!(conflicts[e[1]], e[2])
-        push!(conflicts[e[2]], e[1])
+        if e[1] < e[2]
+            push!(conflicts[e[1]], e[2])
+        else
+            push!(conflicts[e[2]], e[1])
+        end
     end
     for c in conflicts
         sort!(c)
@@ -59,7 +62,7 @@ function write_to_file(J, w, E, W, filepath)
 
         
         for j in J
-            s = string(j, " ", w[j])
+            s *= string(j, " ", w[j])
             for i in conflicts[j] 
                 s *= string(" ", i)
             end
