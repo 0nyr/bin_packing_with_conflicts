@@ -107,16 +107,23 @@ function make_child_node_with_rf_branch(node::Node, j, q)
     return pos_child, neg_child
 end
 
-"removes items in q from J and E, updating addresses as necessary"
+"removes items in q from J, w and E, updating addresses as necessary"
 function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 
     items_amount = length(J)
     amount_to_remove = length(q)
 
+    println("amount_to_remove: $(amount_to_remove)")
+    println("q: $(q)")
+    println("q_on_original_G: $(q_on_original_G)")
+    
+    println("item_address: $(item_address)")
+    println("w: $(w)")
+
     # 
     new_J = Int64[j for j in 1:items_amount-amount_to_remove]
     new_w = Int64[0 for j in new_J]
-        
+
     # removing
     for i in q_on_original_G
         item_address[i] = 0
@@ -125,13 +132,16 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     # updating addresses
     # from largest to smallest k ∈ q:
     #   move to the left all items which address' > k
-    for k in amount_to_remove:1
-        for (j, address) in item_address
+    for k in amount_to_remove:-1:1
+        println("removing q[$(k)] = $(q[k])")
+        for (j, address) in enumerate(item_address)
             if address > q[k]
                 item_address[j] -= 1 
             end
         end
     end
+
+    println("new item_address: $(item_address)")
 
     # remove edges containing removed items
     new_E = [e for e in E if !(e[1] ∈ q_on_original_G) && !(e[2] ∈ q_on_original_G)]
@@ -140,8 +150,12 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 
     # update weights
     for (j, address) in enumerate(item_address)
-        new_w[address] += w[j]
+        if address != 0
+            new_w[address] += w[j]
+        end
     end
+    println("new_w: $(new_w)")
+
 
     return new_J, new_E, new_w
 end
