@@ -282,6 +282,7 @@ end
 "Runs pricing linear programming"
 function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     price = Model(GLPK.Optimizer)
+    set_silent(price)
     @variable(price, 1 >= x[1:length(J)] >= 0)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
