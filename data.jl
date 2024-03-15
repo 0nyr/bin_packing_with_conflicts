@@ -43,6 +43,13 @@ function read_file(filename)
 end
 
 function write_to_file(J, w, E, filepath)
+
+    conflicts = Vector{Int64}[Int64[] for i in J]
+    for e in E
+        push!(conflicts[e[1]], e[2])
+        push!(conflicts[e[2]], e[1])
+    end
+
     open(filepath, "w") do file
         for (n, j) in enumerate(J)
             
