@@ -39,7 +39,7 @@ function read_file(filename)
         sort!(E)
     end
 
-    return J, w, E
+    return J, w, E, W
 end
 
 function write_to_file(J, w, E, W, filepath)
@@ -60,7 +60,6 @@ function write_to_file(J, w, E, W, filepath)
         
         s = string(length(J), " ", W, "\n")
 
-        
         for j in J
             s *= string(j, " ", w[j])
             for i in conflicts[j] 
