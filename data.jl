@@ -42,21 +42,32 @@ function read_file(filename)
     return J, w, E
 end
 
-function write_to_file(J, w, E, filepath)
+function write_to_file(J, w, E, W, filepath)
 
     conflicts = Vector{Int64}[Int64[] for i in J]
     for e in E
         push!(conflicts[e[1]], e[2])
         push!(conflicts[e[2]], e[1])
     end
+    for c in conflicts
+        sort!(c)
+    end
 
     open(filepath, "w") do file
-        for (n, j) in enumerate(J)
+        
+        s = string(length(J), " ", W, "\n")
+
+        
+        for j in J
+            s = string(j, " ", w[j])
+            for i in conflicts[j] 
+                s *= string(" ", i)
+            end
             
-            line = string()
-            line = string()
+            s *= "\n"
         end
-        write(file, line)
+
+        write(file, s)
     end
 end
 
