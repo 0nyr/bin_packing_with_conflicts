@@ -139,7 +139,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     # translate edges
 
     # update weights
-    for (j, address) in item_address
+    for (j, address) in enumerate(item_address)
         new_w[address] += w[j]
     end
 
@@ -283,6 +283,7 @@ end
 function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     price = Model(GLPK.Optimizer)
     set_silent(price)
+    
     @variable(price, 1 >= x[1:length(J)] >= 0)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
@@ -296,7 +297,7 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     
     # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
     @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
-    set_silent(price)
+    # set_silent(price)
 
     # println(pi_bar)
     verbose >=3 && println(price)
@@ -317,6 +318,7 @@ end
 "Runs pricing linear programming, but constrains new lambda to be integer"
 function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     price = Model(GLPK.Optimizer)
+    set_silent(price)
     @variable(price, 1 >= x[1:length(J)] >= 0)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
@@ -330,7 +332,7 @@ function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=
     
     # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
     @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
-    set_silent(price)
+    # set_silent(price)
 
     # println(pi_bar)
     verbose >=3 && println(price)
@@ -707,7 +709,7 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags)
+        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
         if termination_status(master) != OPTIMAL
             break
         end

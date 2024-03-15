@@ -94,6 +94,7 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
 
     for q in bags_in_use
         
+        is_bag_integer = false
         for (j, x_j) in enumerate(S[q])
             is_bag_integer = true
 
