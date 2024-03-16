@@ -113,12 +113,12 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     items_amount = length(J)
     amount_to_remove = length(q)
 
-    println("amount_to_remove: $(amount_to_remove)")
-    println("q: $(q)")
-    println("q_on_original_G: $(q_on_original_G)")
+    # println("amount_to_remove: $(amount_to_remove)")
+    # println("q: $(q)")
+    # println("q_on_original_G: $(q_on_original_G)")
     
-    println("item_address: $(item_address)")
-    println("w: $(w)")
+    # println("item_address: $(item_address)")
+    # println("w: $(w)")
 
     # 
     new_J = Int64[j for j in 1:items_amount-amount_to_remove]
@@ -133,7 +133,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     # from largest to smallest k ∈ q:
     #   move to the left all items which address' > k
     for k in amount_to_remove:-1:1
-        println("removing q[$(k)] = $(q[k])")
+        # println("removing q[$(k)] = $(q[k])")
         for (j, address) in enumerate(item_address)
             if address > q[k]
                 item_address[j] -= 1 
@@ -141,7 +141,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
         end
     end
 
-    println("new item_address: $(item_address)")
+    # println("new item_address: $(item_address)")
 
     # remove edges containing removed items
     new_E = [e for e in E if !(e[1] ∈ q_on_original_G) && !(e[2] ∈ q_on_original_G)]
@@ -154,7 +154,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
             new_w[address] += w[j]
         end
     end
-    println("new_w: $(new_w)")
+    # println("new_w: $(new_w)")
 
 
     return new_J, new_E, new_w
@@ -213,11 +213,19 @@ function register_node(node, nodes, queue)
     push!(nodes, node)
     node.id = length(nodes)
 
+    # println("added node $(node.id)")
+    # println(node)
+
     # add to queue at appropriate position
+    added = false
     for (i, node_id) in enumerate(queue)
         if node.priority <= nodes[node_id].priority
             insert!(queue, i, node.id)
+            added = true
         end
+    end
+    if !(added)
+        push!(queue, node.id)
     end
 end
 
@@ -378,6 +386,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
     m_obj = Inf
 
     # run price, add new columns, check solution, repeat if necessary
+    iteration = 1
     for iteration in 1:max_iter
 
         optimize!(master)
@@ -398,7 +407,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         if p_obj < -epsilon
 
             # price
-            verbose >= 1 && println("adding lambda: $(q)")
+            verbose >= 3 && println("adding lambda: $(q)")
 
             # add new packing scheme to list
             push!(S, q)
@@ -419,11 +428,15 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             end
 
             # show updated master
-            verbose >= 2 && println(master)
+            verbose >= 3 && println(master)
 
         else
             break
         end
+    end
+
+    if iteration == max_iter && verbose >= 3
+        println("CGA reached max iterations before exiting (check price objective value)")
     end
 
     if m_obj == Inf
@@ -734,6 +747,7 @@ function solve_bpc(
         end
 
         if cga_lb + node.mandatory_bag_amount > node.bounds[1]
+
             verbose >= 1 && println("CGA lower bound: $(cga_lb)")
 
             node.bounds[1] = cga_lb + node.mandatory_bag_amount
@@ -761,16 +775,23 @@ function solve_bpc(
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
         if most_fractional_bag != -1
 
+            println("generating bag branch")
+
             # get q to branch on
             q = S[most_fractional_bag]
 
             pos_child, neg_child = make_child_node_with_bag_branch(node, q)
 
+            println("registering positive child")
             register_node(pos_child, nodes, queue)
+
+            println("registering negative child")
             register_node(neg_child, nodes, queue)
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
+
+            println("generating rf branch")
 
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]
@@ -796,8 +817,9 @@ function solve_bpc(
             end  
 
         end
+        println(queue)
     end
-    
+
     verbose >= 1 && println("tree finished")
     
     solution = translate_solution(nodes[best_node[1]], epsilon=epsilon)

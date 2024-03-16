@@ -29,6 +29,8 @@ function read_file(filename)
             j = l[1]
             w_j = l[2]
             conflicts = l[3:end]
+            filter!(x -> x < items_amount, conflicts)
+
 
             push!(J, j)
             push!(w, w_j)
