@@ -31,6 +31,7 @@ heaviest_in_address(addresses, item_address, w) = findmax(x -> w[x], unmerge_bag
 "returns item and weight of lightest item in a set of addresses"
 lightest_in_address(addresses, item_address, w) = findmin(x -> w[x], unmerge_bag_items(addresses, item_address))
 
+"returns an array where if i and j are in conflict, j ∈ array[i] and i ∈ array[j]"
 function get_edges(J, E)    
     edges = Vector{Int64}[Int64[] for i in J]
     for i in J
@@ -42,6 +43,11 @@ function get_edges(J, E)
             end
         end
     end
+
+    # for e in E
+    #     push!(edges[e[1]], e[2])
+    #     push!(edges[e[2]], e[1])
+    # end
     return edges
 end
 
@@ -88,6 +94,7 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
 
     for q in bags_in_use
         
+        is_bag_integer = false
         for (j, x_j) in enumerate(S[q])
             is_bag_integer = true
 
