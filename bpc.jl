@@ -161,7 +161,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 end
 
 "makes children with bag branching"
-function make_child_node_with_bag_branch(node::Node, q::Vector{Float32})
+function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
@@ -176,7 +176,25 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32})
 
     # get positive child (variable to branch on >= 1) 
     # the items in mandatory bags (λ >= 1) are *removed* from the graph and only considered when computing bounds
-    pos_child = deepcopy(node)
+    # pos_child = deepcopy(node)
+    pos_child = Node(
+        length(nodes)+1, # id
+        1*node.priority,
+        deepcopy(node.J),
+        deepcopy(node.E),
+        deepcopy(node.w),
+        deepcopy(node.W),
+        Vector{Float32}[], # S
+        deepcopy(node.mandatory_bags),
+        deepcopy(node.mandatory_bag_amount) + 1, # add the new mandatory bag
+        deepcopy(node.forbidden_bags),
+        deepcopy(node.item_address),
+        false, # interval_graph
+        deepcopy(node.bounds), # node bounds
+        Vector{Int64}[], # solution
+    )
+    pos_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+
     J, E, w, W, S = get_node_parameters(pos_child)
     
     # add bag to mandatory set
@@ -188,12 +206,26 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32})
 
     # get negative child (variable to branch on <= 0)
     # the forbidden bag will be cut with a no good cut (non-robust!)
-    neg_child = deepcopy(node)
-    push!(neg_child.forbidden_bags, q_on_original_G)
+    # neg_child = deepcopy(node)
+    neg_child = Node(
+        length(nodes)+2, # id
+        3*node.priority,
+        deepcopy(node.J),
+        deepcopy(node.E),
+        deepcopy(node.w),
+        deepcopy(node.W),
+        Vector{Float32}[], # S
+        deepcopy(node.mandatory_bags),
+        deepcopy(node.mandatory_bag_amount),
+        deepcopy(node.forbidden_bags),
+        deepcopy(node.item_address),
+        false, # interval_graph
+        deepcopy(node.bounds), # node bounds
+        Vector{Int64}[], # solution
+    )
+    neg_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
-    
-    pos_child.priority = 1*node.priority
-    neg_child.priority = 3*node.priority
+    push!(neg_child.forbidden_bags, q_on_original_G)
 
     return pos_child, neg_child
 
@@ -203,17 +235,19 @@ end
 function register_node(node, nodes, queue)
 
     # clear fields that need clearing
-    node.S = Vector{Float32}[]
-    node.solution = Vector{Int64}[]
-    node.mandatory_bag_amount = length(node.mandatory_bags)
-    node.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1
-    node.interval_graph = false # will need to check again
+    # node.S = Vector{Float32}[]
+    # node.solution = Vector{Int64}[]
+    # node.mandatory_bag_amount = length(node.mandatory_bags)
+    # node.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1
+    # node.interval_graph = false # will need to check again
+
+    println("adding node to node list")
 
     # add new node to list
     push!(nodes, node)
-    node.id = length(nodes)
+    # node.id = length(nodes)
 
-    # println("added node $(node.id)")
+    println("added node $(node.id) to list")
     # println(node)
 
     # add to queue at appropriate position
@@ -227,6 +261,7 @@ function register_node(node, nodes, queue)
     if !(added)
         push!(queue, node.id)
     end
+    
 end
 
 "returns simplest lower bound ( ceil(sum(w)/W) )"
@@ -780,7 +815,7 @@ function solve_bpc(
             # get q to branch on
             q = S[most_fractional_bag]
 
-            pos_child, neg_child = make_child_node_with_bag_branch(node, q)
+            pos_child, neg_child = make_child_node_with_bag_branch(node, q, nodes)
 
             println("registering positive child")
             register_node(pos_child, nodes, queue)
