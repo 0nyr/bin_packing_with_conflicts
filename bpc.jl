@@ -254,7 +254,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
         push!(queue, pos_child.id)
     end
 
-
+    println("nodes: $([i.id for i in nodes]), \n queue: $(queue)")
 
     # Adding negative child to list
 
@@ -267,6 +267,8 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     println("added node $(neg_child.id) to list")
     # println(node)
 
+    println("nodes: $([i.id for i in nodes]), \n queue: $(queue)")
+
     # add to queue at appropriate position
     added = false
     for (i, node_id) in enumerate(queue)
@@ -278,6 +280,8 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     if !(added)
         push!(queue, neg_child.id)
     end
+
+    println("nodes: $([i.id for i in nodes]), \n queue: $(queue)")
 
     println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
