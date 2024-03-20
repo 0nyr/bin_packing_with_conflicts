@@ -1,8 +1,11 @@
 using JuMP
-using GLPK
+using Gurobi
 using LinearAlgebra
 
 include("utils.jl")
+
+const GUROBI_ENV = Gurobi.Env()
+    
 
 # struct representing a node in the BB tree
 mutable struct Node
@@ -393,7 +396,8 @@ end
 
 "Runs pricing linear programming"
 function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
-    price = Model(GLPK.Optimizer)
+    # price = Model(Gurobi.Optimizer)
+    price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
     
     @variable(price, 1 >= x[1:length(J)] >= 0)
@@ -429,7 +433,8 @@ end
 
 "Runs pricing linear programming, but constrains new lambda to be integer"
 function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
-    price = Model(GLPK.Optimizer)
+    # price = Model(Gurobi.Optimizer)
+    price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
     @variable(price, 1 >= x[1:length(J)] >= 0)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
@@ -580,7 +585,7 @@ function solve_bpc(
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
     )
-    
+
     item_amount = length(J)
 
     # [LB, UB]
@@ -740,7 +745,8 @@ function solve_bpc(
         best_solution = deepcopy(initial_solution)
         
         # build master
-        master = Model(GLPK.Optimizer)
+        # master = Model(Gurobi.Optimizer)
+        master = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
         set_silent(master)
         
         # add the naive solution as lambda variables (can serve as artificial variables)

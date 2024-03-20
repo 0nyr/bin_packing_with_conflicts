@@ -1,5 +1,5 @@
 using JuMP
-using GLPK
+using Gurobi
 using LinearAlgebra
 
 "Returns set of items found in a set of addresses"
