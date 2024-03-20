@@ -878,6 +878,8 @@ function solve_bpc(
 
             make_child_node_with_bag_branch(node, q, nodes, queue)
 
+            println("fixed!")
+
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
 
