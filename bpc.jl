@@ -160,8 +160,8 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     return new_J, new_E, new_w
 end
 
-"makes children with bag branching"
-function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node})
+"makes children with bag branching and adds them to queue"
+function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node}, queue::Vector{Int64})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
@@ -204,6 +204,31 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, w, pos_child.item_address)
 
 
+    println("adding node to node list")
+    node = pos_child
+
+    # add new node to list
+    push!(nodes, node)
+    # node.id = length(nodes)
+
+    println("added node $(node.id) to list")
+    # println(node)
+
+    # add to queue at appropriate position
+    added = false
+    for (i, node_id) in enumerate(queue)
+        if node.priority <= nodes[node_id].priority
+            insert!(queue, i, node.id)
+            added = true
+        end
+    end
+    if !(added)
+        push!(queue, node.id)
+    end
+
+
+
+
     # get negative child (variable to branch on <= 0)
     # the forbidden bag will be cut with a no good cut (non-robust!)
     # neg_child = deepcopy(node)
@@ -227,7 +252,28 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
 
     push!(neg_child.forbidden_bags, q_on_original_G)
 
-    return pos_child, neg_child
+
+    println("adding node to node list")
+    node = neg_child
+
+    # add new node to list
+    push!(nodes, node)
+    # node.id = length(nodes)
+
+    println("added node $(node.id) to list")
+    # println(node)
+
+    # add to queue at appropriate position
+    added = false
+    for (i, node_id) in enumerate(queue)
+        if node.priority <= nodes[node_id].priority
+            insert!(queue, i, node.id)
+            added = true
+        end
+    end
+    if !(added)
+        push!(queue, node.id)
+    end
 
 end
 
@@ -815,13 +861,7 @@ function solve_bpc(
             # get q to branch on
             q = S[most_fractional_bag]
 
-            pos_child, neg_child = make_child_node_with_bag_branch(node, q, nodes)
-
-            println("registering positive child")
-            register_node(pos_child, nodes, queue)
-
-            println("registering negative child")
-            register_node(neg_child, nodes, queue)
+            make_child_node_with_bag_branch(node, q, nodes, queue)
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
