@@ -204,31 +204,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, w, pos_child.item_address)
 
 
-    println("adding node to node list")
-    node = pos_child
-
-    # add new node to list
-    push!(nodes, node)
-    # node.id = length(nodes)
-
-    println("added node $(node.id) to list")
-    # println(node)
-
-    # add to queue at appropriate position
-    added = false
-    for (i, node_id) in enumerate(queue)
-        if node.priority <= nodes[node_id].priority
-            insert!(queue, i, node.id)
-            added = true
-        end
-    end
-    if !(added)
-        push!(queue, node.id)
-    end
-
-
-
-
     # get negative child (variable to branch on <= 0)
     # the forbidden bag will be cut with a no good cut (non-robust!)
     # neg_child = deepcopy(node)
@@ -253,26 +228,55 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     push!(neg_child.forbidden_bags, q_on_original_G)
 
 
+    # add nodes to queue
+
+
+    # Adding positive child to list
+
     println("adding node to node list")
-    node = neg_child
 
     # add new node to list
-    push!(nodes, node)
+    push!(nodes, pos_child)
     # node.id = length(nodes)
 
-    println("added node $(node.id) to list")
+    println("added node $(pos_child.id) to list")
     # println(node)
 
     # add to queue at appropriate position
     added = false
     for (i, node_id) in enumerate(queue)
-        if node.priority <= nodes[node_id].priority
-            insert!(queue, i, node.id)
+        if pos_child.priority <= nodes[node_id].priority
+            insert!(queue, i, pos_child.id)
             added = true
         end
     end
     if !(added)
-        push!(queue, node.id)
+        push!(queue, pos_child.id)
+    end
+
+
+
+    # Adding negative child to list
+
+    println("adding node to node list")
+
+    # add new node to list
+    push!(nodes, neg_child)
+    # node.id = length(nodes)
+
+    println("added node $(neg_child.id) to list")
+    # println(node)
+
+    # add to queue at appropriate position
+    added = false
+    for (i, node_id) in enumerate(queue)
+        if neg_child.priority <= nodes[node_id].priority
+            insert!(queue, i, neg_child.id)
+            added = true
+        end
+    end
+    if !(added)
+        push!(queue, neg_child.id)
     end
 
 end
