@@ -279,7 +279,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
         push!(queue, neg_child.id)
     end
 
-    println("branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
+    println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
 
 "adds new node to queue and node list"
