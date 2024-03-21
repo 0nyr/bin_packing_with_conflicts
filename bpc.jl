@@ -62,11 +62,14 @@ end
 "makes children with ryan and foster branching"
 function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
+    w = node.w
+    W = node.W
+
     # variable length representation
-    items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] 
+    items_in_q = Int64[i for (i, val) in enumerate(q) if val > 1e-4] 
 
     # get items that can be merged with j
-    available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < node.W]
+    available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < W]
     
     
     # is there an item such that merging with j is feasible? (w_i + w_j < W) 
@@ -110,6 +113,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         # get the lighest i | i != j
         i_weight = Inf
         lighest_i = -1
+        println("items_in_q: $(items_in_q)")
         for i in items_in_q
             if node.w[i] < i_weight && i != j
                 i_weight = node.w[i]
@@ -141,6 +145,9 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         0, # bounds_status
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+    
+    println("i: $(i), j: $(j), $(node.item_address)")
+    println(node.w)
 
     # E stores in original graph
     i = unmerge_bag_items([i], node.item_address)[1]
@@ -667,7 +674,7 @@ function solve_bpc(
         verbose >=1 && println("node $(node.id)")
 
         # println("$(J)\n$(w)")
-        println("$(node.item_address)")
+        # println("$(node.item_address)")
 
         # get translated edges
         translated_E = translate_edges(E, node.item_address)
@@ -895,16 +902,16 @@ function solve_bpc(
         bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
         most_fractional_bag, most_fractional_item = check_solution_fractionality(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
 
-        println("lambda_bar: $(lambda_bar)")
-        println("bags_in_use: $(bags_in_use)")
-        println("most_fractional_bag: $(most_fractional_bag)")
-        println("most_fractional_item: $(most_fractional_item)")
+        # println("lambda_bar: $(lambda_bar)")
+        # println("bags_in_use: $(bags_in_use)")
+        # println("most_fractional_bag: $(most_fractional_bag)")
+        # println("most_fractional_item: $(most_fractional_item)")
 
         # is there an integer bag to branch on? 
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
         if most_fractional_bag != -1
 
-            # println("generating bag branch")
+            println("generating bag branch")
 
             # get q to branch on
             q = S[most_fractional_bag]
@@ -915,7 +922,7 @@ function solve_bpc(
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
 
-            # println("generating rf branch")
+            println("generating rf branch")
 
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]

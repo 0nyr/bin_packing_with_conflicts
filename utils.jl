@@ -93,9 +93,8 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
     item_closest = 1
 
     for q in bags_in_use
+        # println("checking integrality of $(q)")
         
-        println("checking integrality of $(q)")
-
         # check items integrality
         is_bag_integer = true
         for (j, x_j) in enumerate(S[q])
@@ -113,7 +112,7 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
                     most_fractional_item = [q, j]  
                 end
             end
-            println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
+            # println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
         end
 
         # check lambda integrality
@@ -129,7 +128,7 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
                     most_fractional_bag = q  
                 end
             end
-            println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
+            # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
         end
     end
 
