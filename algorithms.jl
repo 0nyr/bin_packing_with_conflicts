@@ -1,11 +1,11 @@
 using JuMP
-using GLPK
+using Gurobi
 using LinearAlgebra
 
 
 "Solves with Revised Simplex Algorithm"
 function rsa(A, b, c, integer=false)
-    m = Model(GLPK.Optimizer)
+    m = Model(Gurobi.Optimizer)
 
     if integer
         @variable(m, x[1:4] >= 0, Int)
@@ -45,7 +45,7 @@ function bba(model, verbose=1)
             print(m)
         end
         
-        set_optimizer(m, GLPK.Optimizer)
+        set_optimizer(m, Gurobi.Optimizer)
         optimize!(m)
 
         if termination_status(m) == OPTIMAL
@@ -183,7 +183,7 @@ function bpa(A, P, bm, bp, c, master=nothing, price=nothing, verbose=1, cga_verb
             verbose=cga_verbose, 
             solved=solved)
 
-        # set_optimizer(master, GLPK.Optimizer)
+        # set_optimizer(master, Gurobi.Optimizer)
         # optimize!(master)
 
         if termination_status(master) == OPTIMAL
@@ -360,7 +360,7 @@ function cga(A, P, bm, bp, c; master=nothing, price=nothing, S=nothing, M=9e6, v
 
     ### build the master
     if isnothing(master)
-        master = Model(GLPK.Optimizer)
+        master = Model(Gurobi.Optimizer)
 
         # artificial variable
         @variable(master, a[1:A_nrows] >= 0)
@@ -376,7 +376,7 @@ function cga(A, P, bm, bp, c; master=nothing, price=nothing, S=nothing, M=9e6, v
         println("master built")
     else
         master = copy(master)
-        set_optimizer(master, GLPK.Optimizer)
+        set_optimizer(master, Gurobi.Optimizer)
         # retrieving references
         # m_c = master[:m_c]
         convexity = master[:convexity]
@@ -408,7 +408,7 @@ function cga(A, P, bm, bp, c; master=nothing, price=nothing, S=nothing, M=9e6, v
 
     ### build the price
     # if isnothing(price)
-    #     price = Model(GLPK.Optimizer)
+    #     price = Model(Gurobi.Optimizer)
     #     set_silent(price)
 
     #     @variable(price, x[1:x_amount] >= 0)
@@ -420,7 +420,7 @@ function cga(A, P, bm, bp, c; master=nothing, price=nothing, S=nothing, M=9e6, v
     #     )
     # else
     #     price = copy(price)
-    #     set_optimizer(price, GLPK.Optimizer)
+    #     set_optimizer(price, Gurobi.Optimizer)
 
     #     # retrieving references
     #     p_c = price[:p_c]
@@ -438,7 +438,7 @@ function cga(A, P, bm, bp, c; master=nothing, price=nothing, S=nothing, M=9e6, v
         end
 
         ### build the price
-        price = Model(GLPK.Optimizer)
+        price = Model(Gurobi.Optimizer)
         set_silent(price)
 
         @variable(price, x[1:x_amount] >= 0)
@@ -555,7 +555,7 @@ end
 
 #     ### BUILDING THE MASTER
 
-#     master = Model(GLPK.Optimizer)
+#     master = Model(Gurobi.Optimizer)
 
 #     # artificial variable
 #     @variable(master, a[1:sl] >= 0)
@@ -575,7 +575,7 @@ end
 
 #     ### BUILDING THE PRICE
 
-#     price = Model(GLPK.Optimizer)
+#     price = Model(Gurobi.Optimizer)
 #     set_silent(price)
 
 #     @variable(price, x[1:x_amount] >= 0)
