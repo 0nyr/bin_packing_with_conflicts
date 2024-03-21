@@ -883,7 +883,7 @@ function solve_bpc(
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
         if most_fractional_bag != -1
 
-            println("generating bag branch")
+            # println("generating bag branch")
 
             # get q to branch on
             q = S[most_fractional_bag]
@@ -894,7 +894,7 @@ function solve_bpc(
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
 
-            println("generating rf branch")
+            # println("generating rf branch")
 
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]
