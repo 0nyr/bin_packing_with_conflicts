@@ -33,17 +33,13 @@ get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S
 "merges two items i and j, merging conflicts, summing their weights"
 function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{Int64}, item_address::Vector{Int64})
     
-    if i == j
-        error()
-    end
-
     # first, make sure i is the lesser value
     i, j = sort([i,j])
 
     old_address = item_address[j]
 
     new_J = J[1:end-1]
-    new_w = Int64[0 for j in J]
+    new_w = Int64[0 for j in new_J]
 
     # update address of j
     item_address[j] = item_address[i]
@@ -52,6 +48,10 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     println("original_w: $(original_w)")
     println("new_w: $(new_w)")
     
+    if i == j
+        error()
+    end
+
     # "for j in original J"
     for k in eachindex(item_address)
 
