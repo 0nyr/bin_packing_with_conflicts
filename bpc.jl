@@ -31,8 +31,12 @@ end
 get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S
 
 "merges two items i and j, merging conflicts, summing their weights"
-function merge_items(i, j, J, w, item_address)
+function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{Int64}, item_address::Vector{Int64})
     
+    if i == j
+        error()
+    end
+
     # first, make sure i is the lesser value
     i, j = sort([i,j])
 
@@ -43,9 +47,17 @@ function merge_items(i, j, J, w, item_address)
 
     # update address of j
     item_address[j] = item_address[i]
+
+    println("merging $(i) and $(j)")
+    println("original_w: $(original_w)")
+    println("new_w: $(new_w)")
     
     # "for j in original J"
     for k in eachindex(item_address)
+
+        if item_address[k] < 1 # skip items in mandatory bags
+            continue
+        end
 
         # update addresses of items where address > old address of j
         if item_address[k] > old_address
@@ -53,14 +65,16 @@ function merge_items(i, j, J, w, item_address)
         end
 
         # add weight to address
-        new_w[item_address[k]] += w[k]
+        println("k: $(k), $(original_w[k]) at $(item_address[k])")
+        new_w[item_address[k]] += original_w[k]
+        println("$(new_w)\n$(item_address)")
     end
 
     return new_J, new_w
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     w = node.w
     W = node.W
@@ -149,7 +163,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     println("i: $(i), j: $(j), $(node.item_address)")
     println(node.w)
 
-    # E stores in original graph
+    # E stores conflicts in terms of the original graph
     i = unmerge_bag_items([i], node.item_address)[1]
     j = unmerge_bag_items([j], node.item_address)[1]
 
@@ -619,6 +633,9 @@ function solve_bpc(
 
     # where can item j be found? (for merging items)
     base_item_adress = Int64[j for j in J]
+
+    # original w
+    original_w = deepcopy(w)
     
     # initialize node list
     nodes = Node[Node(
@@ -927,7 +944,7 @@ function solve_bpc(
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]
 
-            make_child_node_with_rf_branch(node, j, q, nodes, node_counter)
+            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
 
         else # the solution is integer!
 
