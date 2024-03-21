@@ -165,7 +165,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 end
 
 "makes children with bag branching and adds them to queue"
-function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node}, queue::Vector{Int64})
+function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
@@ -182,7 +182,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     # the items in mandatory bags (λ >= 1) are *removed* from the graph and only considered when computing bounds
     # pos_child = deepcopy(node)
     pos_child = Node(
-        length(nodes)+1, # id
+        node_counter[1]+1, # id
         1*node.priority,
         deepcopy(node.J),
         deepcopy(node.E),
@@ -213,7 +213,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     # the forbidden bag will be cut with a no good cut (non-robust!)
     # neg_child = deepcopy(node)
     neg_child = Node(
-        length(nodes)+2, # id
+        node_counter[1]+2, # id
         3*node.priority,
         deepcopy(node.J),
         deepcopy(node.E),
@@ -238,16 +238,13 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
 
 
     # Adding positive child to list
-
-    println("adding node to node list")
-
-    # add new node to list
     push!(nodes, pos_child)
-    # node.id = length(nodes)
-
     println("added node $(pos_child.id) to list")
-    # println(node)
 
+    # Adding negative child to list
+    push!(nodes, neg_child)
+    println("added node $(neg_child.id) to list")
+    
     # add to queue at appropriate position
     added = false
     for (i, node_id) in enumerate(queue)
@@ -259,35 +256,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     if !(added)
         push!(queue, pos_child.id)
     end
-
-    println("nodes: $([i.id for i in nodes]), \n queue: $(queue)")
-
-    # Adding negative child to list
-
-    println("adding node to node list")
-
-    # add new node to list
-    push!(nodes, neg_child)
-    # node.id = length(nodes)
-
-    println("added node $(neg_child.id) to list")
-    # println(node)
-
-    println("nodes: $([i.id for i in nodes]), \n queue: $(queue)")
-
-    # add to queue at appropriate position
-    added = false
-    for (i, node_id) in enumerate(queue)
-        if neg_child.priority <= nodes[node_id].priority
-            insert!(queue, i, neg_child.id)
-            added = true
-        end
-    end
-    if !(added)
-        push!(queue, neg_child.id)
-    end
-
-    println("nodes: $([i.id for i in nodes]), \n queue: $(queue)")
 
     println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
@@ -552,17 +520,17 @@ end
     1: node done;
     2: UB = LB;
 """
-function update_bounds_status(node, bounds, best_node, nodes, queue; verbose=1)
+function update_bounds_status(node, bounds, best_node, nodes; verbose=1)
 
     # update global lower bound
-    bounds[1], _ = findmin(x -> nodes[x].bounds[1], vcat(queue, best_node))
+    bounds[1], _ = findmin(x -> x.bounds[1], vcat(nodes, best_node))
 
     # default status (continue processing node)
     status = 0
     
     if node.bounds[2] < bounds[2] # is there a new best solution?
         bounds[2] = node.bounds[2]
-        best_node[1] = node.id
+        best_node[1] = node
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
@@ -616,18 +584,20 @@ function solve_bpc(
         Vector{Int64}[], # solution
         0, # bounds_status
     )]
-    queue = Int64[1]
     
-    best_node = Int64[1]
+    best_node = Node[1]
+    node_counter = Int64[1]
+
+    not_first_node = false
 
     # Start the tree
-    while !(isempty(queue))
+    while !(isempty(nodes))
 
         # for all nodes except the first, check if there is a point in processing it (prune the tree)
-        if queue[1] != 1
+        if not_first_node
 
             # update bounds status
-            update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+            update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
             if node.bounds_status != 0 # is it a global or local optimal?
                 if node.bounds_status == 1 # no need to continue
                     # prune the tree
@@ -636,11 +606,12 @@ function solve_bpc(
                     break
                 end
             end
+        else
+            not_first_node = true
         end
 
         # get next node
-        next_node_id = splice!(queue, 1)
-        node = nodes[next_node_id]
+        _, node = findmin(x -> x.priority, nodes)
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
@@ -672,7 +643,7 @@ function solve_bpc(
             verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node.bounds[1])")
     
             # update bounds status
-            update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+            update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
             if node.bounds_status != 0 # is it a global or local optimal?
                 if node.bounds_status == 1 # no need to continue
                     # prune the tree
@@ -700,7 +671,7 @@ function solve_bpc(
                     node.solution = ffd_solution
                     
                     # update bounds status
-                    update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+                    update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
                     if node.bounds_status != 0 # is it a global or local optimal?
                         if node.bounds_status == 1 # no need to continue
                             # prune the tree
@@ -731,7 +702,7 @@ function solve_bpc(
                 verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node.bounds[1])")
 
                 # update bounds status
-                update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+                update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
                 if node.bounds_status != 0 # is it a global or local optimal?
                     if node.bounds_status == 1 # no need to continue
                         # prune the tree
@@ -818,7 +789,7 @@ function solve_bpc(
                 node.solution = best_solution
                 
                 # update bounds status
-                update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+                update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
                 if node.bounds_status != 0 # is it a global or local optimal?
                     if node.bounds_status == 1 # no need to continue
                         # prune the tree
@@ -854,7 +825,7 @@ function solve_bpc(
             node.bounds[1] = cga_lb + node.mandatory_bag_amount
 
             # update bounds status
-            update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+            update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
             if node.bounds_status != 0 # is it a global or local optimal?
                 if node.bounds_status == 1 # no need to continue
                     # prune the tree
@@ -881,7 +852,7 @@ function solve_bpc(
             # get q to branch on
             q = S[most_fractional_bag]
 
-            make_child_node_with_bag_branch(node, q, nodes, queue)
+            make_child_node_with_bag_branch(node, q, nodes, node_counter)
 
             println("fixed!")
 
@@ -905,7 +876,7 @@ function solve_bpc(
         else # the solution is integer!
 
             # update bounds status
-            update_bounds_status(node, bounds, best_node, nodes, queue, verbose=verbose)
+            update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
             if node.bounds_status != 0 # is it a global or local optimal?
                 if node.bounds_status == 1 # no need to continue
                     # prune the tree
@@ -914,7 +885,6 @@ function solve_bpc(
             end  
 
         end
-        println(queue)
     end
 
     verbose >= 1 && println("tree finished")
