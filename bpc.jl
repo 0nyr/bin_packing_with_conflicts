@@ -52,6 +52,8 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
         error()
     end
 
+    println("old_address: $(old_address)")
+
     # "for j in original J"
     for k in eachindex(item_address)
 
