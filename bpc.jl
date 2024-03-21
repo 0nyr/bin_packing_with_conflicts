@@ -578,6 +578,11 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
     end
 
     node.bounds_status = status
+
+    if status ∈ [1,2]
+        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        println("node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+    end
     # return status
 end
 
@@ -652,6 +657,9 @@ function solve_bpc(
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
+        # println("$(J)\n$(w)")
+        println("$(node.item_address)")
+
         # get translated edges
         translated_E = translate_edges(E, node.item_address)
 
@@ -662,6 +670,10 @@ function solve_bpc(
 
         ## first try solving the node with heuristics and bounds' properties
 
+        # get initial lower bound ( ⌈∑w/W⌉ ) 
+        node.bounds[1] = get_simple_lower_bound(w, W) + node.mandatory_bag_amount
+        verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node.bounds[1])")
+        
         # naive solution (one item per bag)
         naive_solution = get_naive_solution(J)
 
@@ -674,10 +686,6 @@ function solve_bpc(
             node.solution = naive_solution
     
             verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
-    
-            # get initial lower bound ( ⌈∑w/W⌉ ) 
-            node.bounds[1] = get_simple_lower_bound(w, W) + node.mandatory_bag_amount
-            verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node.bounds[1])")
     
             # update bounds status
             update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
@@ -734,7 +742,7 @@ function solve_bpc(
             lower_bound = get_l2_lower_bound(alpha, W, w)
             if lower_bound + node.mandatory_bag_amount > node.bounds[1]
 
-                node.bounds[1] = lower_bound + mandatory_bag_amount
+                node.bounds[1] = lower_bound + node.mandatory_bag_amount
                 verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node.bounds[1])")
 
                 # update bounds status
