@@ -638,12 +638,12 @@ function solve_bpc(
         # for all nodes except the first, check if there is a point in processing it (prune the tree)
         if not_first_node
 
-            
+            filter!(x -> x.bounds[1] < bounds[2], nodes)
 
             # update bounds status
             update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
-            if node.bounds_status != 0 # is it a global or local optimal?
-                if node.bounds_status == 1 # no need to continue
+            if node.bounds_status != 0 # should we continue processing this node?
+                if node.bounds_status == 1 # no need to continue *this* node
                     # prune the tree
                     continue
                 else # global optimal
@@ -655,8 +655,8 @@ function solve_bpc(
         end
 
         # get next node
-        _, next_node_id = findmin(x -> x.priority, nodes)
-        node = nodes[next_node_id]
+        _, next_node_position = findmin(x -> x.priority, nodes)
+        node = splice!(nodes, next_node_position)
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
