@@ -60,7 +60,7 @@ function merge_items(i, j, J, w, item_address)
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j, q)
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, nodes:Vector{Node}, node_counter::Vector{Int64})
     
     # variable length representation
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] 
@@ -76,12 +76,34 @@ function make_child_node_with_rf_branch(node::Node, j, q)
         _, i = findmax(x -> w[x], available_to_merge)
         
         # make child
-        pos_child = deepcopy(node)
-    
+        # pos_child = deepcopy(node)
+        node_counter[1] += 1
+        pos_child = Node(
+            node_counter[1], # id
+            1*node.priority,
+            deepcopy(node.J),
+            deepcopy(node.E),
+            deepcopy(node.w),
+            deepcopy(node.W),
+            Vector{Float32}[], # S
+            deepcopy(node.mandatory_bags),
+            deepcopy(node.mandatory_bag_amount),
+            deepcopy(node.forbidden_bags),
+            deepcopy(node.item_address),
+            false, # interval_graph
+            deepcopy(node.bounds), # node bounds
+            Vector{Int64}[], # solution
+            0, # bounds_status
+        )
+        pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+
         # update graph
         J, E, w, W, S = get_node_parameters(pos_child)
         pos_child.J, pos_child.w = merge_items(i, j, J, w, item_address)
-        
+    
+        # Adding positive child to list
+        push!(nodes, pos_child)
+        println("added node $(pos_child.id) to list")            
         
     else # merging is infeasible, only create negative child, with lighest i (higher probability of being in the same bag) 
 
@@ -96,11 +118,29 @@ function make_child_node_with_rf_branch(node::Node, j, q)
         end
         i = lighest_i
 
-        pos_child = nothing
     end
 
     # split branch
-    neg_child = deepcopy(node)
+    # neg_child = deepcopy(node)
+    node_counter[1] += 1
+    neg_child = Node(
+        node_counter[1], # id
+        1*node.priority,
+        deepcopy(node.J),
+        deepcopy(node.E),
+        deepcopy(node.w),
+        deepcopy(node.W),
+        Vector{Float32}[], # S
+        deepcopy(node.mandatory_bags),
+        deepcopy(node.mandatory_bag_amount),
+        deepcopy(node.forbidden_bags),
+        deepcopy(node.item_address),
+        false, # interval_graph
+        deepcopy(node.bounds), # node bounds
+        Vector{Int64}[], # solution
+        0, # bounds_status
+    )
+    neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
     # E stores in original graph
     i = unmerge_bag_items([i], node.item_address)[1]
@@ -108,7 +148,9 @@ function make_child_node_with_rf_branch(node::Node, j, q)
 
     push!(neg_child.E, sort([i,j]))
 
-    return pos_child, neg_child
+    # Adding negative child to list
+    push!(nodes, neg_child)
+    println("added node $(neg_child.id) to list")
 end
 
 "removes items in q from J, w and E, updating addresses as necessary"
@@ -198,7 +240,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
         Vector{Int64}[], # solution
         0, # bounds_status
     )
-    pos_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
     J, E, w, W, S = get_node_parameters(pos_child)
     
@@ -234,9 +276,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     push!(neg_child.forbidden_bags, q_on_original_G)
 
 
-    # add nodes to queue
-
-
     # Adding positive child to list
     push!(nodes, pos_child)
     println("added node $(pos_child.id) to list")
@@ -245,19 +284,22 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     push!(nodes, neg_child)
     println("added node $(neg_child.id) to list")
     
-    # add to queue at appropriate position
-    added = false
-    for (i, node_id) in enumerate(queue)
-        if pos_child.priority <= nodes[node_id].priority
-            insert!(queue, i, pos_child.id)
-            added = true
-        end
-    end
-    if !(added)
-        push!(queue, pos_child.id)
-    end
+    # count new nodes
+    node_counter[1] += 2
 
-    println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
+    # add to queue at appropriate position
+    # added = false
+    # for (i, node_id) in enumerate(queue)
+    #     if pos_child.priority <= nodes[node_id].priority
+    #         insert!(queue, i, pos_child.id)
+    #         added = true
+    #     end
+    # end
+    # if !(added)
+    #     push!(queue, pos_child.id)
+    # end
+
+    # println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
 
 "adds new node to queue and node list"
@@ -585,7 +627,7 @@ function solve_bpc(
         0, # bounds_status
     )]
     
-    best_node = Node[1]
+    best_node = Node[nodes[1]]
     node_counter = Int64[1]
 
     not_first_node = false
@@ -595,6 +637,8 @@ function solve_bpc(
 
         # for all nodes except the first, check if there is a point in processing it (prune the tree)
         if not_first_node
+
+            
 
             # update bounds status
             update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
@@ -611,7 +655,8 @@ function solve_bpc(
         end
 
         # get next node
-        _, node = findmin(x -> x.priority, nodes)
+        _, next_node_id = findmin(x -> x.priority, nodes)
+        node = nodes[next_node_id]
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
@@ -864,15 +909,8 @@ function solve_bpc(
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]
 
+            make_child_node_with_rf_branch(node, j, q, nodes, node_counter)
 
-
-            pos_child, neg_child = make_child_node_with_rf_branch(node, j, q)
-
-            if !(isnothing(pos_child))
-                register_node(pos_child, nodes, queue)
-            end
-            register_node(neg_child, nodes, queue)
-        
         else # the solution is integer!
 
             # update bounds status
@@ -889,7 +927,7 @@ function solve_bpc(
 
     verbose >= 1 && println("tree finished")
     
-    solution = translate_solution(nodes[best_node[1]], epsilon=epsilon)
+    solution = translate_solution(best_node[1], epsilon=epsilon)
     final_solution = get_pretty_solution(solution, bounds[2])
 
     return final_solution, bounds[2]
