@@ -99,7 +99,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
 
         # update graph
         J, E, w, W, S = get_node_parameters(pos_child)
-        pos_child.J, pos_child.w = merge_items(i, j, J, w, item_address)
+        pos_child.J, pos_child.w = merge_items(i, j, J, w, pos_child.item_address)
     
         # Adding positive child to list
         push!(nodes, pos_child)
@@ -170,6 +170,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     new_J = Int64[j for j in 1:items_amount-amount_to_remove]
     new_w = Int64[0 for j in new_J]
 
+    println("q_on_original_G: $(q_on_original_G)")
     # removing
     for i in q_on_original_G
         item_address[i] = 0
@@ -179,13 +180,14 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     # from largest to smallest k ∈ q:
     #   move to the left all items which address' > k
     for k in amount_to_remove:-1:1
-        # println("removing q[$(k)] = $(q[k])")
+        println("removing q[$(k)] = $(q[k])")
         for (j, address) in enumerate(item_address)
             if address > q[k]
                 item_address[j] -= 1 
             end
         end
     end
+    println("here: $(item_address)")
 
     # println("new item_address: $(item_address)")
 
@@ -209,9 +211,15 @@ end
 "makes children with bag branching and adds them to the list"
 function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
+    println("q: $(q)")
+    
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
     
+    println("q: $(q)")
+    println("q_on_original_G: $(q_on_original_G)")
+
+
     # who lives at address j?
     # items_in_address = Vector{Int64}[Int64[] for j in J]
     # for (j, address) in enumerate(item_address)
@@ -555,7 +563,7 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
     # update global lower bound
     bounds[1], _ = findmin(x -> x.bounds[1], vcat(node, nodes, best_node))
 
-    
+
     # default status (continue processing node)
     status = 0
     
@@ -887,6 +895,10 @@ function solve_bpc(
         bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
         most_fractional_bag, most_fractional_item = check_solution_fractionality(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
 
+        println("lambda_bar: $(lambda_bar)")
+        println("bags_in_use: $(bags_in_use)")
+        println("most_fractional_bag: $(most_fractional_bag)")
+        println("most_fractional_item: $(most_fractional_item)")
 
         # is there an integer bag to branch on? 
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
