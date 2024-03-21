@@ -36,6 +36,10 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     # first, make sure i is the lesser value
     i, j = sort([i,j])
 
+    println("merging $(i) and $(j)")
+    println("item_address: $(item_address)")
+
+
     old_address = item_address[j]
 
     new_J = J[1:end-1]
@@ -44,7 +48,6 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     # update address of j
     item_address[j] = item_address[i]
 
-    println("merging $(i) and $(j)")
     println("original_w: $(original_w)")
     println("new_w: $(new_w)")
     
