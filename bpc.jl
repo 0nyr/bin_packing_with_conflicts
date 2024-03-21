@@ -206,7 +206,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     return new_J, new_E, new_w
 end
 
-"makes children with bag branching and adds them to queue"
+"makes children with bag branching and adds them to the list"
 function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
@@ -286,18 +286,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     
     # count new nodes
     node_counter[1] += 2
-
-    # add to queue at appropriate position
-    # added = false
-    # for (i, node_id) in enumerate(queue)
-    #     if pos_child.priority <= nodes[node_id].priority
-    #         insert!(queue, i, pos_child.id)
-    #         added = true
-    #     end
-    # end
-    # if !(added)
-    #     push!(queue, pos_child.id)
-    # end
 
     # println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
