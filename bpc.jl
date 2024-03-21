@@ -72,9 +72,9 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
         end
 
         # add weight to address
-        println("k: $(k), $(original_w[k]) at $(item_address[k])")
+        # println("k: $(k), $(original_w[k]) at $(item_address[k])")
         new_w[item_address[k]] += original_w[k]
-        println("$(new_w)\n$(item_address)")
+        # println("$(new_w)\n$(item_address)")
     end
 
     return new_J, new_w
@@ -108,7 +108,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         node_counter[1] += 1
         pos_child = Node(
             node_counter[1], # id
-            1*node.priority,
+            # 1*node.priority,
+            length(node.J)-1,
             deepcopy(node.J),
             deepcopy(node.E),
             deepcopy(node.w),
@@ -154,7 +155,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     node_counter[1] += 1
     neg_child = Node(
         node_counter[1], # id
-        1*node.priority,
+        # 1*node.priority,
+        length(node.J),
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -265,7 +267,8 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
     # pos_child = deepcopy(node)
     pos_child = Node(
         node_counter[1]+1, # id
-        1*node.priority,
+        # 1*node.priority,
+        length(node.J)-length(q),
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -296,7 +299,8 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
     # neg_child = deepcopy(node)
     neg_child = Node(
         node_counter[1]+2, # id
-        3*node.priority,
+        # 3*node.priority,
+        length(node.J),
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
