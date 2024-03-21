@@ -555,6 +555,7 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
     # update global lower bound
     bounds[1], _ = findmin(x -> x.bounds[1], vcat(node, nodes, best_node))
 
+    
     # default status (continue processing node)
     status = 0
     
