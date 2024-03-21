@@ -103,7 +103,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     
         # Adding positive child to list
         push!(nodes, pos_child)
-        println("added node $(pos_child.id) to list")            
+        # println("added node $(pos_child.id) to list")            
         
     else # merging is infeasible, only create negative child, with lighest i (higher probability of being in the same bag) 
 
@@ -150,7 +150,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
 
     # Adding negative child to list
     push!(nodes, neg_child)
-    println("added node $(neg_child.id) to list")
+    # println("added node $(neg_child.id) to list")
 end
 
 "removes items in q from J, w and E, updating addresses as necessary"
@@ -278,11 +278,11 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
 
     # Adding positive child to list
     push!(nodes, pos_child)
-    println("added node $(pos_child.id) to list")
+    # println("added node $(pos_child.id) to list")
 
     # Adding negative child to list
     push!(nodes, neg_child)
-    println("added node $(neg_child.id) to list")
+    # println("added node $(neg_child.id) to list")
     
     # count new nodes
     node_counter[1] += 2
