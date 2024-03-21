@@ -39,28 +39,30 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     println("merging $(i) and $(j)")
     println("item_address: $(item_address)")
 
+    # j is the old address
+    old_address = j
 
-    old_address = item_address[j]
-
+    # now we move everyone previously at j to i
+    for item_i in unmerge_bag_items([j], item_address)
+        item_address[item_i] = i
+    end
+    
+    # from the perspective of the current node, there will be one less item
     new_J = J[1:end-1]
     new_w = Int64[0 for j in new_J]
 
-    # update address of j
-    item_address[j] = item_address[i]
-
     println("original_w: $(original_w)")
     println("new_w: $(new_w)")
+    println("old_address: $(old_address)")
     
     if i == j
         error()
     end
 
-    println("old_address: $(old_address)")
-
     # "for j in original J"
     for k in eachindex(item_address)
 
-        if item_address[k] < 1 # skip items in mandatory bags
+        if item_address[k] == 0 # skip items in mandatory bags
             continue
         end
 
@@ -85,6 +87,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     W = node.W
 
     # variable length representation
+    println("q: $(q)")
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > 1e-4] 
     println("j: $(j), items_in_q: $(items_in_q)")
 
