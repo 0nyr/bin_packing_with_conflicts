@@ -36,8 +36,8 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     # first, make sure i is the lesser value
     i, j = sort([i,j])
 
-    println("merging $(i) and $(j)")
-    println("item_address: $(item_address)")
+    # println("merging $(i) and $(j)")
+    # println("item_address: $(item_address)")
 
     # j is the old address
     old_address = j
@@ -51,9 +51,9 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     new_J = J[1:end-1]
     new_w = Int64[0 for j in new_J]
 
-    println("original_w: $(original_w)")
-    println("new_w: $(new_w)")
-    println("old_address: $(old_address)")
+    # println("original_w: $(original_w)")
+    # println("new_w: $(new_w)")
+    # println("old_address: $(old_address)")
     
     if i == j
         error()
@@ -87,13 +87,13 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     W = node.W
 
     # variable length representation
-    println("q: $(q)")
+    # println("q: $(q)")
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > 1e-4] 
-    println("j: $(j), items_in_q: $(items_in_q)")
+    # println("j: $(j), items_in_q: $(items_in_q)")
 
     # get items that can be merged with j
     available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < W]
-    println("available_to_merge: $(available_to_merge)")
+    # println("available_to_merge: $(available_to_merge)")
     
     
     # is there an item such that merging with j is feasible? (w_i + w_j < W) 
@@ -149,6 +149,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         i = lighest_i
 
     end
+
+    print("rf branching on items $(i) and $(j)")
 
     # split branch
     # neg_child = deepcopy(node)
@@ -245,13 +247,14 @@ end
 "makes children with bag branching and adds them to the list"
 function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
-    println("q: $(q)")
+    # println("q: $(q)")
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
     
-    println("q: $(q)")
-    println("q_on_original_G: $(q_on_original_G)")
+    println("branching on bag q: $(q_on_original_G)")
+    # println("q: $(q)")
+    # println("q_on_original_G: $(q_on_original_G)")
 
 
     # who lives at address j?
@@ -705,6 +708,8 @@ function solve_bpc(
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
+        print("node $(node.id): |J| = $(length(J))")
+
         # println("$(J)\n$(w)")
         # println("$(node.item_address)")
 
@@ -943,18 +948,13 @@ function solve_bpc(
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
         if most_fractional_bag != -1
 
-            println("generating bag branch")
-
             # get q to branch on
             q = S[most_fractional_bag]
 
             make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
 
-
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
-
-            println("generating rf branch")
 
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]
