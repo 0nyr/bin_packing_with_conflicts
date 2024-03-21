@@ -150,7 +150,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
 
     end
 
-    print("rf branching on items $(i) and $(j)")
+    println("rf branching on items $(i) and $(j)")
 
     # split branch
     # neg_child = deepcopy(node)
@@ -182,7 +182,10 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     i = unmerge_bag_items([i], node.item_address)[1]
     j = unmerge_bag_items([j], node.item_address)[1]
 
+    println("item_address: $(neg_child.item_address)")
+    println("E before: $(neg_child.E)")
     push!(neg_child.E, sort([i,j]))
+    println("E now: $(neg_child.E)")
 
     # Adding negative child to list
     push!(nodes, neg_child)
@@ -958,6 +961,8 @@ function solve_bpc(
 
             q = S[most_fractional_item[1]]
             j = most_fractional_item[2]
+
+            println("q: $(q)")
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
 
