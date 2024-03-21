@@ -473,6 +473,10 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
 
     # println(pi_bar)
     verbose >=3 && println(price)
+    # if !(print_once[1])
+    #     println(price)
+    #     print_once[1] = true
+    # end
     println(price)
     optimize!(price)
 
@@ -510,7 +514,6 @@ function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=
 
     # println(pi_bar)
     verbose >=3 && println(price)
-    println(price)
     optimize!(price)
 
     # is the price feasible?
@@ -537,6 +540,8 @@ end
 function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4)
     
     m_obj = Inf
+
+    global print_once = [false]
 
     # run price, add new columns, check solution, repeat if necessary
     iteration = 1
