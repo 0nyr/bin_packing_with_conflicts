@@ -74,24 +74,27 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     w = node.w
     W = node.W
 
     # variable length representation
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > 1e-4] 
+    println("j: $(j), items_in_q: $(items_in_q)")
 
     # get items that can be merged with j
     available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < W]
+    println("available_to_merge: $(available_to_merge)")
     
     
     # is there an item such that merging with j is feasible? (w_i + w_j < W) 
     if !(isempty(available_to_merge))
         
         # get largest item in bag, except the fractional item
-        _, i = findmax(x -> w[x], available_to_merge)
-        
+        _, i_index = findmax(x -> w[x], available_to_merge)
+        i = available_to_merge[i_index]
+
         # make child
         # pos_child = deepcopy(node)
         node_counter[1] += 1
@@ -116,7 +119,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
 
         # update graph
         J, E, w, W, S = get_node_parameters(pos_child)
-        pos_child.J, pos_child.w = merge_items(i, j, J, w, pos_child.item_address)
+        pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
     
         # Adding positive child to list
         push!(nodes, pos_child)
@@ -175,7 +178,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
 end
 
 "removes items in q from J, w and E, updating addresses as necessary"
-function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
+function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
 
     items_amount = length(J)
     amount_to_remove = length(q)
@@ -220,7 +223,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
     # update weights
     for (j, address) in enumerate(item_address)
         if address != 0
-            new_w[address] += w[j]
+            new_w[address] += original_w[j]
         end
     end
     # println("new_w: $(new_w)")
@@ -230,7 +233,7 @@ function remove_from_graph(q, q_on_original_G, J, E, w, item_address)
 end
 
 "makes children with bag branching and adds them to the list"
-function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     println("q: $(q)")
     
@@ -277,7 +280,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, nodes::
     push!(pos_child.mandatory_bags, q_on_original_G)
 
     # remove the items in the mandatory bag from the graph
-    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, w, pos_child.item_address)
+    pos_child.J, pos_child.E, pos_child.w = remove_from_graph(q, q_on_original_G, J, E, original_w, pos_child.item_address)
 
 
     # get negative child (variable to branch on <= 0)
@@ -933,7 +936,7 @@ function solve_bpc(
             # get q to branch on
             q = S[most_fractional_bag]
 
-            make_child_node_with_bag_branch(node, q, nodes, node_counter)
+            make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
 
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
