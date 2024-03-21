@@ -60,7 +60,7 @@ function merge_items(i, j, J, w, item_address)
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, nodes:Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     # variable length representation
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > .5] 
@@ -553,7 +553,7 @@ end
 function update_bounds_status(node, bounds, best_node, nodes; verbose=1)
 
     # update global lower bound
-    bounds[1], _ = findmin(x -> x.bounds[1], vcat(nodes, best_node))
+    bounds[1], _ = findmin(x -> x.bounds[1], vcat(node, nodes, best_node))
 
     # default status (continue processing node)
     status = 0
@@ -623,6 +623,10 @@ function solve_bpc(
     # Start the tree
     while !(isempty(nodes))
 
+        # get next node
+        _, next_node_position = findmin(x -> x.priority, nodes)
+        node = splice!(nodes, next_node_position)
+
         # for all nodes except the first, check if there is a point in processing it (prune the tree)
         if not_first_node
 
@@ -642,9 +646,6 @@ function solve_bpc(
             not_first_node = true
         end
 
-        # get next node
-        _, next_node_position = findmin(x -> x.priority, nodes)
-        node = splice!(nodes, next_node_position)
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
