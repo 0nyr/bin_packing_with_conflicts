@@ -181,9 +181,14 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     # E stores conflicts in terms of the original graph
     i = unmerge_bag_items([i], node.item_address)[1]
     j = unmerge_bag_items([j], node.item_address)[1]
-
+    
     println("item_address: $(neg_child.item_address)")
     println("E before: $(neg_child.E)")
+
+    if sort([i, j]) ∈ neg_child.E
+        error()
+    end
+
     push!(neg_child.E, sort([i,j]))
     println("E now: $(neg_child.E)")
 
@@ -468,6 +473,7 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
 
     # println(pi_bar)
     verbose >=3 && println(price)
+    println(price)
     optimize!(price)
 
     # is the price feasible?
@@ -504,6 +510,7 @@ function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=
 
     # println(pi_bar)
     verbose >=3 && println(price)
+    println(price)
     optimize!(price)
 
     # is the price feasible?
@@ -685,6 +692,8 @@ function solve_bpc(
     # Start the tree
     while !(isempty(nodes))
 
+        println("\n")
+
         # get next node
         _, next_node_position = findmin(x -> x.priority, nodes)
         node = splice!(nodes, next_node_position)
@@ -718,6 +727,7 @@ function solve_bpc(
 
         # get translated edges
         translated_E = translate_edges(E, node.item_address)
+        println("translated_E: $(translated_E)")
 
         # get translated mandatory/forbidden bags
         forbidden_bags = Vector{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
