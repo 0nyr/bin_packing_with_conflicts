@@ -562,8 +562,8 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
         bounds[2] = node.bounds[2]
         best_node[1] = node
 
-        pretty_solution = get_pretty_solution(translate_solution(node.solution), bounds)
-        println("node $(node.id): $(pretty_solution)")
+        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        println("node $(node.id): $(bounds[2]) -> $(pretty_solution)")
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
