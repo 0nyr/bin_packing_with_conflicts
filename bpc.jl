@@ -134,19 +134,19 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         push!(nodes, pos_child)
         # println("added node $(pos_child.id) to list")            
         
-    else # merging is infeasible, only create negative child, with lighest i (higher probability of being in the same bag) 
+    else # merging is infeasible, only create negative child, with heaviest i (higher impact on solution) 
 
-        # get the lighest i | i != j
-        i_weight = Inf
-        lighest_i = -1
-        println("items_in_q: $(items_in_q)")
+        # get the heaviest i | i != j
+        i_weight = -Inf
+        heaviest_i = -1
+        # println("items_in_q: $(items_in_q)")
         for i in items_in_q
-            if node.w[i] < i_weight && i != j
+            if node.w[i] > i_weight && i != j
                 i_weight = node.w[i]
-                lighest_i = i 
+                heaviest_i = i 
             end
         end
-        i = lighest_i
+        i = heaviest_i
 
     end
 
@@ -708,7 +708,7 @@ function solve_bpc(
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
-        print("node $(node.id): |J| = $(length(J))")
+        println("node $(node.id): |J| = $(length(J))")
 
         # println("$(J)\n$(w)")
         # println("$(node.item_address)")
