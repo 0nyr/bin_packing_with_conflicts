@@ -550,7 +550,7 @@ end
     1: node done;
     2: UB = LB;
 """
-function update_bounds_status(node, bounds, best_node, nodes; verbose=1)
+function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
 
     # update global lower bound
     bounds[1], _ = findmin(x -> x.bounds[1], vcat(node, nodes, best_node))
@@ -561,6 +561,9 @@ function update_bounds_status(node, bounds, best_node, nodes; verbose=1)
     if node.bounds[2] < bounds[2] # is there a new best solution?
         bounds[2] = node.bounds[2]
         best_node[1] = node
+
+        pretty_solution = get_pretty_solution(translate_solution(node.solution), bounds)
+        println("node $(node.id): $(pretty_solution)")
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
@@ -716,15 +719,14 @@ function solve_bpc(
                     end   
                 end
 
-                initial_solution = deepcopy(ffd_solution)
+                initial_solution = deepcopy(ffd_solution)    
             end
+        end
     
-        elseif naive_solution_is_good
+        if run_ffd && !(ffd_solution_is_good) && naive_solution_is_good
             initial_solution = deepcopy(naive_solution)
-
         else # no solution
             initial_solution = Vector{Int64}[]
-        
         end
         
         # try to improve lower bound with martello L2 lower bound
@@ -847,10 +849,10 @@ function solve_bpc(
             break
         end
 
-        # is there already a better or equal solution?
-        if cga_lb + node.mandatory_bag_amount >= bounds[2]
-            continue # close node
-        end
+        # # is there already a better or equal solution?
+        # if cga_lb + node.mandatory_bag_amount >= bounds[2]
+        #     continue # close node
+        # end
 
         if cga_lb + node.mandatory_bag_amount > node.bounds[1]
 
@@ -888,7 +890,6 @@ function solve_bpc(
 
             make_child_node_with_bag_branch(node, q, nodes, node_counter)
 
-            println("fixed!")
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
         elseif most_fractional_item[1] != -1
@@ -902,15 +903,33 @@ function solve_bpc(
 
         else # the solution is integer!
 
-            # update bounds status
-            update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
-            if node.bounds_status != 0 # is it a global or local optimal?
-                if node.bounds_status == 1 # no need to continue
-                    # prune the tree
-                    continue
-                end
-            end  
+            # get solution values
+            lambda_bar = value.(lambdas)
+            x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
+        
+            # treat current solution
+            current_solution = round_up_solution(x_bar)
+            current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
 
+            # was there an improvement?
+            if cga_ub + node.mandatory_bag_amount < node.bounds[2]
+        
+                node.bounds[2] = cga_ub + node.mandatory_bag_amount
+                best_solution = deepcopy(current_solution)
+                node.solution = best_solution
+                
+                # update bounds status
+                update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
+                if node.bounds_status != 0 # should we stop processing?
+                    if node.bounds_status == 1 # no need to continue
+                        # prune the tree
+                        continue
+                    else # global optimal
+                        break
+                        # return best_solution, bounds[2]
+                    end
+                end  
+            end
         end
     end
 
