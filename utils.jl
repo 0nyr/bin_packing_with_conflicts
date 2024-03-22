@@ -256,8 +256,10 @@ function translate_solution(node; epsilon=1e-4)
 
     address_items = Vector{Int64}[Int64[0 for j in node.item_address] for i in node.J]
 
-    for (j, address) in enumerate(node.item_address) 
-        address_items[address][j] = 1
+    for (j, address) in enumerate(node.item_address)
+        if address != 0
+            address_items[address][j] = 1
+        end 
     end
 
 
