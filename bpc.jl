@@ -456,7 +456,8 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
     
-    @variable(price, 1 >= x[1:length(J)] >= 0)
+    # @variable(price, 1 >= x[1:length(J)] >= 0)
+    @variable(price, x[1:length(J)], Bin)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
@@ -498,6 +499,7 @@ function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
     @variable(price, 1 >= x[1:length(J)] >= 0)
+    # @variable(price, x[1:length(J)], Bin)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
