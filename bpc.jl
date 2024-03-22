@@ -493,7 +493,7 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     return p_obj, value.(price[:x])
 end
 
-"Runs pricing linear programming, but constrains new lambda to be integer"
+"Runs pricing linear programming, but constrains the new lambda to be integer"
 function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
