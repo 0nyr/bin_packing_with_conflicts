@@ -86,7 +86,7 @@ function most_fractional_on_vector(v; epsilon=1e-4)
 end
 
 "Utility to find most fractional bag and most fractional item in a solution"
-function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
+function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
     
     
     # find most most fractional item and most fractional bag 
@@ -133,6 +133,58 @@ function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J
             # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
         end
     end
+
+    return most_fractional_bag, most_fractional_item
+end
+
+"Analyze branching possibilities"
+function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
+    
+    
+    # find most most fractional item and most fractional bag 
+    most_fractional_bag = -1
+    most_fractional_item = [-1, -1]
+    bag_closest = 1
+    item_closest = 1
+
+
+    for q in bags_in_use
+        # println("checking integrality of $(q)")
+        
+        # check lambda (bag) integrality
+        d = lambda_bar[q]
+        diff = lambda_bar[q] - floor(lambda_bar[q])
+        
+        if diff > epsilon && diff < 1-epsilon
+
+            d = abs(diff - 0.5) 
+            if d < bag_closest
+                bag_closest = d
+                most_fractional_bag = q  
+            end
+        end
+        
+        # check items integrality
+        is_bag_integer = true
+        for (j, x_j) in enumerate(S[q])
+
+            d = lambda_bar[q]*x_j
+            # d = x_j
+            diff = d - floor(d)
+            
+            if diff > epsilon && diff < 1-epsilon
+                is_bag_integer = false
+
+                d = abs(diff - 0.5) 
+                if d < item_closest
+                    item_closest = d
+                    most_fractional_item = [q, j]  
+                end
+            end
+        end
+    end
+
+
 
     # amount of *items* in each bag
     bag_item_amount = Float32[sum(S[q]) for q in bags_in_use]
