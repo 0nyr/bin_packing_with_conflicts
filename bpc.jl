@@ -770,7 +770,7 @@ function solve_bpc(
         end
 
         # [conflicts of i for each i in J]
-        conflicts = get_edges(J, E)
+        conflicts = get_edges(J, translated_E)
 
         # FFD heuristic for initial solution and upper bound
         if run_ffd
