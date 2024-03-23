@@ -86,7 +86,7 @@ function most_fractional_on_vector(v; epsilon=1e-4)
 end
 
 "Utility to find most fractional bag and most fractional item in a solution"
-function make_branching_analysis(bags_in_use, lambda_bar, S, S_len; epsilon=1e-4)
+function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
     
     
     # find most most fractional item and most fractional bag 
@@ -131,6 +131,26 @@ function make_branching_analysis(bags_in_use, lambda_bar, S, S_len; epsilon=1e-4
                 end
             end
             # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
+        end
+    end
+
+    # amount of *items* in each bag
+    bag_item_amount = Float32[sum(S[q]) for q in bags_in_use]
+
+    # amount of *conflicts* in each bag
+    bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
+
+    # amount of *edges* in each bag
+    bag_edges_amount = Int64[0 for i in bags_in_use]
+
+    for (bag_i, q) in enumerate(bags_in_use)
+        for (j, val) in enumerate(q)
+            if val > epsilon
+                for item_k in conflicts[j]
+                    bag_conflicts[bag_i][item_k] = 1
+                end
+                bag_edges_amount[bag_i] += length(conflicts[j])
+            end
         end
     end
 

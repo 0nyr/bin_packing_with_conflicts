@@ -393,7 +393,7 @@ function get_l2_lower_bound(alpha, W, w)
 end
 
 "apply First Fit Decreasing heuristic considering conflicts"
-function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
+function first_fit_decreasing_with_conflicts(J, w, W, E, conflicts; verbose=true)
     bags = Vector{Int64}[Int64[0 for j in J] for i in J]
     # bags = Vector{Bool}[Bool[0 for j in J] for i in J]
     bags_sizes = Int64[0 for i in J]
@@ -401,9 +401,6 @@ function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
     bags_conflicts = Vector{Bool}[Bool[0 for j in J] for i in J]
 
     J = sort(J, rev=true, by=(x)->w[x])
-
-    # [conflicts of i for each i in J]
-    conflicts = get_edges(J, E)
 
     bags_amount = 1
     # for each item in decreasing order
@@ -772,9 +769,12 @@ function solve_bpc(
             end
         end
 
+        # [conflicts of i for each i in J]
+        conflicts = get_edges(J, E)
+
         # FFD heuristic for initial solution and upper bound
         if run_ffd
-            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, translated_E, verbose=verbose>1)
+            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, translated_E, conflicts, verbose=verbose>1)
 
             # remove forbidden bags from ffd solution
             ffd_solution_is_good = remove_forbidden_bags(ffd_solution, forbidden_bags)
@@ -957,7 +957,7 @@ function solve_bpc(
         
         # get branching candidates
         bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
-        most_fractional_bag, most_fractional_item = make_branching_analysis(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
+        most_fractional_bag, most_fractional_item = make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J, epsilon=1e-4)
 
         # println("lambda_bar: $(lambda_bar)")
         # println("bags_in_use: $(bags_in_use)")
