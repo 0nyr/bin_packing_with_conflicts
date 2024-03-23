@@ -957,7 +957,7 @@ function solve_bpc(
         
         # get branching candidates
         bags_in_use, lambdas_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
-        most_fractional_bag, most_fractional_item = make_branching_analysis(bags_in_use, lambdas_in_use, lambda_bar, S, S_len, conflicts, J, w, epsilon=1e-4)
+        most_fractional_bag = make_branching_analysis(bags_in_use, lambdas_in_use, lambda_bar, S, S_len, conflicts, J, w, epsilon=1e-4)
 
         # println("lambda_bar: $(lambda_bar)")
         # println("bags_in_use: $(bags_in_use)")
@@ -974,14 +974,14 @@ function solve_bpc(
             make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
 
         # if not, is there an item to branch on? (Ryan and Foster branching)
-        elseif most_fractional_item[1] != -1
+        # elseif most_fractional_item[1] != -1
 
-            q = S[most_fractional_item[1]]
-            j = most_fractional_item[2]
+        #     q = S[most_fractional_item[1]]
+        #     j = most_fractional_item[2]
 
-            println("q: $(q)")
+        #     println("q: $(q)")
 
-            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
+        #     make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
 
         else # the solution is integer!
 

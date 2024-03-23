@@ -145,9 +145,6 @@ function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_in_use::Vect
     bag_closest = 1
     item_closest = 1
 
-    # check lambda integrality
-    
-    
     # bags in use that are fractional
     fractional_bags = Int64[]
     for q in bags_in_use
@@ -168,30 +165,34 @@ function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_in_use::Vect
             end
         end
     end
-    # fractional_bag_weight = Float32[sum(S[q].*w) for q in fractional_bags]
 
-    # amount of *items* in each bag
-    bag_item_amount = Float32[sum(S[q]) for q in fractional_bags]
+    # # fractional bag weights
+    # fractional_bags_weights = Float32[sum(S[q].*w) for q in fractional_bags]
 
-    # conflicts of each bag
-    bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
+    # # just read the code...
+    # frac_bags_frac_weights = fractional_bags_weights.*Float32[lambda_bar[q] for q in fractional_bags]
 
-    # amount of *edges* in each bag
-    bag_edges_amount = Int64[0 for i in fractional_bags]
-    for (bag_i, q) in enumerate(fractional_bags)
-        for (j, val) in enumerate(q)
-            if val > epsilon
-                for item_k in conflicts[j]
-                    bag_conflicts[bag_i][item_k] = 1
-                end
-                bag_edges_amount[bag_i] += length(conflicts[j])
-            end
-        end
-    end
+    # # amount of *items* in each bag
+    # bag_item_amount = Float32[sum(S[q]) for q in fractional_bags]
 
-    # amount of *conflicts* in each bag
-    bag_conflicts_amount = Int64[sum(i) for i in bag_conflicts]
+    # # conflicts of each bag
+    # bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
 
+    # # amount of *edges* in each bag
+    # bag_edges_amount = Int64[0 for i in fractional_bags]
+    # for (bag_i, q) in enumerate(fractional_bags)
+    #     for (j, val) in enumerate(q)
+    #         if val > epsilon
+    #             bag_edges_amount[bag_i] += length(conflicts[j])
+    #             # for item_k in conflicts[j]
+    #             #     bag_conflicts[bag_i][item_k] = 1
+    #             # end
+    #         end
+    #     end
+    # end
+
+    # # amount of *conflicts* in each bag
+    # bag_conflicts_amount = Int64[sum(i) for i in bag_conflicts]
 
     return most_fractional_bag
 end
