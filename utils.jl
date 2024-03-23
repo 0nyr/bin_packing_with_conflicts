@@ -136,65 +136,49 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
 end
 
 "Analyze branching possibilities"
-function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J, w; epsilon=1e-4)
+function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_in_use::Vector{Float32}, lambda_bar::Vector{Float32}, S::Vector{Vector{Float32}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float32=1e-4)
     
     
-    # find most most fractional item (by weight) and most fractional bag 
+    # find most fractional item (by weight) and most fractional bag 
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
     bag_closest = 1
     item_closest = 1
 
-
-    lambda_in_use = Float32[]
+    # check lambda integrality
+    
+    
+    # bags in use that are fractional
+    fractional_bags = Int64[]
     for q in bags_in_use
-        # println("checking integrality of $(q)")
-        
-        # check lambda (bag) integrality
+
+        if !(isapprox(lambda_bar[q], 0, atol=epsilon)) || !(isapprox(lambda_bar[q], 1, atol=epsilon))
+            push!(fractional_bags, q)
+        end
+
         d = lambda_bar[q]
         diff = lambda_bar[q] - floor(lambda_bar[q])
         
         if diff > epsilon && diff < 1-epsilon
-
+    
             d = abs(diff - 0.5) 
             if d < bag_closest
                 bag_closest = d
                 most_fractional_bag = q  
             end
         end
-        
-        # check items integrality
-        is_bag_integer = true
-        for (j, x_j) in enumerate(S[q])
-
-            d = lambda_bar[q]*x_j
-            # d = x_j
-            diff = d - floor(d)
-            
-            if diff > epsilon && diff < 1-epsilon
-                is_bag_integer = false
-
-                d = abs(diff - 0.5) 
-                if d < item_closest
-                    item_closest = d
-                    most_fractional_item = [q, j]  
-                end
-            end
-        end
     end
-
-
+    # fractional_bag_weight = Float32[sum(S[q].*w) for q in fractional_bags]
 
     # amount of *items* in each bag
-    bag_item_amount = Float32[sum(S[q]) for q in bags_in_use]
+    bag_item_amount = Float32[sum(S[q]) for q in fractional_bags]
 
-    # amount of *conflicts* in each bag
+    # conflicts of each bag
     bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
 
     # amount of *edges* in each bag
-    bag_edges_amount = Int64[0 for i in bags_in_use]
-
-    for (bag_i, q) in enumerate(bags_in_use)
+    bag_edges_amount = Int64[0 for i in fractional_bags]
+    for (bag_i, q) in enumerate(fractional_bags)
         for (j, val) in enumerate(q)
             if val > epsilon
                 for item_k in conflicts[j]
@@ -205,7 +189,11 @@ function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J
         end
     end
 
-    return most_fractional_bag, most_fractional_item
+    # amount of *conflicts* in each bag
+    bag_conflicts_amount = Int64[sum(i) for i in bag_conflicts]
+
+
+    return most_fractional_bag
 end
 
 "returns {i | λ_i > 0 ∀ i}"
