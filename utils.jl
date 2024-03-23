@@ -87,13 +87,11 @@ end
 
 "Utility to find most fractional bag and most fractional item in a solution"
 function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
-    
-    
-    # find most most fractional item and most fractional bag 
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
     bag_closest = 1
     item_closest = 1
+
     for q in bags_in_use
         # println("checking integrality of $(q)")
         
@@ -101,8 +99,8 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
         is_bag_integer = true
         for (j, x_j) in enumerate(S[q])
 
-            d = lambda_bar[q]*x_j
-            # d = x_j
+            # d = lambda_bar[q]*x_j
+            d = x_j
             diff = d - floor(d)
             
             if diff > epsilon && diff < 1-epsilon
@@ -117,7 +115,7 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
             # println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
         end
 
-        # check lambda (bag) integrality
+        # check lambda integrality
         if is_bag_integer
             d = lambda_bar[q]
             diff = lambda_bar[q] - floor(lambda_bar[q])
