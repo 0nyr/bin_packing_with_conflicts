@@ -85,13 +85,15 @@ function most_fractional_on_vector(v; epsilon=1e-4)
     return bound_on
 end
 
-"Utility to find most fractional integer bag and most fractional item in a solution"
-function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon=1e-4)
+"Utility to find most fractional bag and most fractional item in a solution"
+function make_branching_analysis(bags_in_use, lambda_bar, S, S_len; epsilon=1e-4)
+    
+    
+    # find most most fractional item and most fractional bag 
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
     bag_closest = 1
     item_closest = 1
-
     for q in bags_in_use
         # println("checking integrality of $(q)")
         
@@ -115,7 +117,7 @@ function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon
             # println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
         end
 
-        # check lambda integrality
+        # check lambda (bag) integrality
         if is_bag_integer
             d = lambda_bar[q]
             diff = lambda_bar[q] - floor(lambda_bar[q])

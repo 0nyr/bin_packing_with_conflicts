@@ -957,7 +957,7 @@ function solve_bpc(
         
         # get branching candidates
         bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
-        most_fractional_bag, most_fractional_item = check_solution_fractionality(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
+        most_fractional_bag, most_fractional_item = make_branching_analysis(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
 
         # println("lambda_bar: $(lambda_bar)")
         # println("bags_in_use: $(bags_in_use)")
