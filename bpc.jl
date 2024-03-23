@@ -475,7 +475,7 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     #     println(price)
     #     print_once[1] = true
     # end
-    println(price)
+    # println(price)
     optimize!(price)
 
     # is the price feasible?
