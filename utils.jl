@@ -136,7 +136,7 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
 end
 
 "Analyze branching possibilities"
-function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_in_use::Vector{Float32}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float32}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float32=1e-4)
+function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_in_use::Vector{Float32}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float32}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float64=1e-4)
     
     
     # find most fractional item (by weight) and most fractional bag 
