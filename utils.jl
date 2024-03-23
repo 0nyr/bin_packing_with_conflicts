@@ -85,7 +85,7 @@ function most_fractional_on_vector(v; epsilon=1e-4)
     return bound_on
 end
 
-"Utility to find most fractional bag and most fractional item in a solution"
+"(needs to be fixed) Utility to find most fractional bag and most fractional item in a solution"
 function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
@@ -94,17 +94,32 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
 
     for q in bags_in_use
         # println("checking integrality of $(q)")
+
+        # check lambda integrality
+        d = lambda_bar[q]
+        diff = lambda_bar[q] - floor(lambda_bar[q])
         
+        if diff > epsilon && diff < 1-epsilon
+
+            d = abs(diff - 0.5) 
+            if d < bag_closest
+                bag_closest = d
+                most_fractional_bag = q  
+            end
+        else # bag is integer
+            continue
+        end
+        # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
+
+
         # check items integrality
-        is_bag_integer = true
         for (j, x_j) in enumerate(S[q])
 
-            # d = lambda_bar[q]*x_j
-            d = x_j
+            d = lambda_bar[q]*x_j
+            # d = x_j
             diff = d - floor(d)
             
             if diff > epsilon && diff < 1-epsilon
-                is_bag_integer = false
 
                 d = abs(diff - 0.5) 
                 if d < item_closest
@@ -115,37 +130,23 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
             # println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
         end
 
-        # check lambda integrality
-        if is_bag_integer
-            d = lambda_bar[q]
-            diff = lambda_bar[q] - floor(lambda_bar[q])
-            
-            if diff > epsilon && diff < 1-epsilon
-
-                d = abs(diff - 0.5) 
-                if d < bag_closest
-                    bag_closest = d
-                    most_fractional_bag = q  
-                end
-            end
-            # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
-        end
     end
 
     return most_fractional_bag, most_fractional_item
 end
 
 "Analyze branching possibilities"
-function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
+function make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J, w; epsilon=1e-4)
     
     
-    # find most most fractional item and most fractional bag 
+    # find most most fractional item (by weight) and most fractional bag 
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
     bag_closest = 1
     item_closest = 1
 
 
+    lambda_in_use = Float32[]
     for q in bags_in_use
         # println("checking integrality of $(q)")
         
@@ -211,15 +212,17 @@ end
 function get_bags_in_use(lambda_bar, S, S_len, J; epsilon=1e-4)
     # bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
     bags_in_use = Int64[]
+    lambdas_in_use = Float32[]
 
     # get bags selected for use
     for q in 1:S_len
         if lambda_bar[q] > epsilon 
             push!(bags_in_use, q)
+            push!(lambdas_in_use, q)
         end
     end
     
-    return bags_in_use
+    return bags_in_use, lambdas_in_use
 end
 
 "from lambda, returns x"
