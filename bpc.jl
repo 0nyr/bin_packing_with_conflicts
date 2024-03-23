@@ -493,8 +493,8 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     return p_obj, value.(price[:x])
 end
 
-"Runs pricing linear programming, but constrains the new lambda to be integer"
-function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
+"Runs relaxed pricing linear programming, but constrains the new lambda to be integer"
+function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
@@ -885,7 +885,7 @@ function solve_bpc(
         # if node.interval_graph...
 
         # run column generation with integer pricing
-        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
         if termination_status(master) == OPTIMAL
             
             # get solution values
