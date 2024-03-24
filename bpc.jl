@@ -333,11 +333,11 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
 
     # Adding positive child to list
     push!(nodes, pos_child)
-    # println("added node $(pos_child.id) to list")
+    println("added node $(pos_child.id) to list")
 
     # Adding negative child to list
     push!(nodes, neg_child)
-    # println("added node $(neg_child.id) to list")
+    println("added node $(neg_child.id) to list")
     
     # count new nodes
     node_counter[1] += 2
@@ -698,6 +698,8 @@ function solve_bpc(
 
     # Start the tree
     while !(isempty(nodes))
+
+        println("global bounds: $(bounds)")
 
         pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
         println("node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
