@@ -850,7 +850,7 @@ function solve_bpc(
         # build master
         # master = Model(Gurobi.Optimizer)
         master = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
-        # set_silent(master)
+        set_silent(master)
         
         # add the naive solution as lambda variables (can serve as artificial variables)
         S = Vector{Float32}[q for q in naive_solution]
