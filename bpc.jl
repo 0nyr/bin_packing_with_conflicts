@@ -906,7 +906,7 @@ function solve_bpc(
             current_solution = round_up_solution(x_bar)
             current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
             
-            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub) + $(node.mandatory_bag_amount) mandatory bags")
+            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
         
             # was there an improvement from the heuristic?
             if cga_ub + node.mandatory_bag_amount < node.bounds[2]
@@ -948,7 +948,7 @@ function solve_bpc(
 
         if cga_lb + node.mandatory_bag_amount > node.bounds[1]
 
-            verbose >= 1 && println("CGA lower bound: $(cga_lb) + $(node.mandatory_bag_amount) mandatory bags")
+            verbose >= 1 && println("CGA lower bound: $(cga_lb + node.mandatory_bag_amount)")
 
             node.bounds[1] = cga_lb + node.mandatory_bag_amount
 
