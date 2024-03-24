@@ -294,7 +294,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
         Vector{Int64}[], # solution
         0, # bounds_status
     )
-    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J)-length(q) + 1 # remove prior upper bound
 
     J, E, w, W, S = get_node_parameters(pos_child)
     
@@ -791,10 +791,10 @@ function solve_bpc(
 
             if ffd_solution_is_good
 
-                verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
+                verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound + node.mandatory_bag_amount)")
                 
                 # if a better solution than one item per bag was found 
-                if ffd_upper_bound < node.bounds[2]
+                if ffd_upper_bound + node.mandatory_bag_amount < node.bounds[2]
                     node.bounds[2] = ffd_upper_bound + node.mandatory_bag_amount
                     node.solution = ffd_solution
                     
@@ -906,7 +906,7 @@ function solve_bpc(
             current_solution = round_up_solution(x_bar)
             current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
             
-            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub)")
+            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub) + $(node.mandatory_bag_amount) mandatory bags")
         
             # was there an improvement from the heuristic?
             if cga_ub + node.mandatory_bag_amount < node.bounds[2]
@@ -948,7 +948,7 @@ function solve_bpc(
 
         if cga_lb + node.mandatory_bag_amount > node.bounds[1]
 
-            verbose >= 1 && println("CGA lower bound: $(cga_lb)")
+            verbose >= 1 && println("CGA lower bound: $(cga_lb) + $(node.mandatory_bag_amount) mandatory bags")
 
             node.bounds[1] = cga_lb + node.mandatory_bag_amount
 
