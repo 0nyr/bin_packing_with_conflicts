@@ -7,6 +7,6 @@ J, w, E, W = read_file("BPWC_0_6_8.txt")
 
 println("J: $(J)\nw: $(w)\nW: $(W)\nE: $(E)")
 
-solution, z = solve_bpc(J, E, w, W, verbose=3, run_ffd=true)
+solution, z = solve_bpc(J, E, w, W, verbose=1, run_ffd=true, max_iter=10000)
 
 println("solution: $(solution)\nz: $(z)")

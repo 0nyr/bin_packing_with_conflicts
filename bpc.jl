@@ -656,6 +656,7 @@ function solve_bpc(
     verbose::Int64=1, 
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
+    max_iter::Int64=100,
     )
 
     item_amount = length(J)
@@ -884,7 +885,7 @@ function solve_bpc(
         end
     
         # objective function
-        @objective(master, Min, sum(lambdas) + 10*item_amount*sum(artificial_variables))
+        @objective(master, Min, sum(lambdas) + 1000*item_amount*sum(artificial_variables))
     
         # show initial master
         verbose >= 2 && println(master)
@@ -894,7 +895,7 @@ function solve_bpc(
         # if node.interval_graph...
 
         # run column generation with integer pricing
-        m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
         if termination_status(master) == OPTIMAL
             
             # get solution values
@@ -934,7 +935,7 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
         if termination_status(master) != OPTIMAL
             println("node $(node.id) linear programming failed to optimize")
             break
