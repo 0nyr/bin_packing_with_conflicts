@@ -316,6 +316,8 @@ end
 "translates a solution, unmerging items and adding mandatory bags"
 function translate_solution(node; epsilon=1e-4)
 
+    println("mandatory_bags: $(node.mandatory_bags)")
+
     translated_solution = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
     address_items = Vector{Int64}[Int64[0 for j in node.item_address] for i in node.J]
@@ -336,8 +338,18 @@ function translate_solution(node; epsilon=1e-4)
         end
     end
 
+    # convert mandatory_bags to constant length, binary arrays
+    mandatory_bags_binary = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.mandatory_bag_amount]
+    for (i, bag_items) in enumerate(node.mandatory_bags)
+        for j in bag_items
+            mandatory_bags_binary[i][j] = 1     
+        end
+    end
+
     # add the mandatory_bags
-    translated_solution = vcat(translated_solution, node.mandatory_bags)
+    translated_solution = vcat(translated_solution, mandatory_bags_binary)
+
+    println("translated_solution: $(translated_solution)")
 
     return translated_solution
 end

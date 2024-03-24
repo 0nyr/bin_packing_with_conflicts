@@ -740,7 +740,7 @@ function solve_bpc(
 
         # get translated edges
         translated_E = translate_edges(E, node.item_address)
-        println("translated_E: $(translated_E)")
+        # println("translated_E: $(translated_E)")
 
         # get translated mandatory/forbidden bags
         forbidden_bags = Vector{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
