@@ -214,7 +214,7 @@ function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
     new_J = Int64[j for j in 1:items_amount-amount_to_remove]
     new_w = Int64[0 for j in new_J]
 
-    println("q_on_original_G: $(q_on_original_G)")
+    # println("q_on_original_G: $(q_on_original_G)")
     # removing
     for i in q_on_original_G
         item_address[i] = 0
@@ -231,7 +231,7 @@ function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
             end
         end
     end
-    println("here: $(item_address)")
+    # println("here: $(item_address)")
 
     # println("new item_address: $(item_address)")
 
@@ -624,8 +624,8 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
         bounds[2] = node.bounds[2]
         best_node[1] = node
 
-        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
-        println("node $(node.id): $(bounds[2]) -> $(pretty_solution)")
+        # pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        # println("node $(node.id): $(bounds[2]) -> $(pretty_solution)")
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
@@ -641,10 +641,10 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
 
     node.bounds_status = status
 
-    if status ∈ [1,2]
-        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
-        println("node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
-    end
+    # if status ∈ [1,2]
+        # pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        # println("node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+    # end
     # return status
 end
 
@@ -693,10 +693,20 @@ function solve_bpc(
 
     not_first_node = false
 
+    node = nodes[1]
+
     # Start the tree
     while !(isempty(nodes))
 
+        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        println("node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+        println("node $(node.id): |J| = $(length(J))")
+        println("mandatory_bags: $(node.mandatory_bags)")
+        println("solution: $(node.solution)")
+        println("item_address: $(node.item_address)")
+        
         println("\n")
+
 
         # get next node
         _, next_node_position = findmin(x -> x.priority, nodes)
@@ -724,7 +734,6 @@ function solve_bpc(
         J, E, w, W, S = get_node_parameters(node)
         verbose >=1 && println("node $(node.id)")
 
-        println("node $(node.id): |J| = $(length(J))")
 
         # println("$(J)\n$(w)")
         # println("$(node.item_address)")
