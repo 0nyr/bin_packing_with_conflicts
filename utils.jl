@@ -320,6 +320,7 @@ function translate_solution(node; epsilon=1e-4)
 
     translated_solution = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
+    # items at address i, for each i
     address_items = Vector{Int64}[Int64[0 for j in node.item_address] for i in node.J]
 
     for (j, address) in enumerate(node.item_address)
@@ -347,9 +348,12 @@ function translate_solution(node; epsilon=1e-4)
     end
 
     # add the mandatory_bags
-    translated_solution = vcat(translated_solution, mandatory_bags_binary)
+    # translated_solution = vcat(translated_solution, mandatory_bags_binary)
+    for (i, j) in enumerate(node.bounds[2]-node.mandatory_bag_amount+1:node.bounds[2])
+        translated_solution[j] = mandatory_bags_binary[i]
+    end
 
-    println("translated_solution: $(translated_solution)")
+    # println("translated_solution: $(translated_solution)")
 
     return translated_solution
 end
