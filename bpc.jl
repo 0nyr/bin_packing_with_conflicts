@@ -996,6 +996,8 @@ function solve_bpc(
 
         else # the solution is integer!
 
+            verbose >= 1 && println("node $(node.id) finished with integer solution by CGA")
+
             # get solution values
             lambda_bar = value.(lambdas)
             x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
