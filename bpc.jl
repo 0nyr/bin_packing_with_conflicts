@@ -540,7 +540,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
     
     m_obj = Inf
 
-    global print_once = [false]
+    # global print_once = [false]
 
     # run price, add new columns, check solution, repeat if necessary
     iteration = 1
@@ -849,7 +849,7 @@ function solve_bpc(
         # build master
         # master = Model(Gurobi.Optimizer)
         master = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
-        set_silent(master)
+        # set_silent(master)
         
         # add the naive solution as lambda variables (can serve as artificial variables)
         S = Vector{Float32}[q for q in naive_solution]
@@ -936,6 +936,7 @@ function solve_bpc(
         # apply cga
         z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
         if termination_status(master) != OPTIMAL
+            println("node $(node.id) linear programming failed to optimize")
             break
         end
 
@@ -1028,6 +1029,10 @@ function solve_bpc(
     
     solution = translate_solution(best_node[1], epsilon=epsilon)
     final_solution = get_pretty_solution(solution, bounds[2])
+
+    println("bounds: $(bounds)")
+    println("node.bounds: $(node.bounds)")
+    println("node.bounds_status: $(node.bounds_status)")
 
     return final_solution, bounds[2]
 end
