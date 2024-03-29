@@ -318,7 +318,7 @@ end
 "translates a solution, unmerging items and adding mandatory bags"
 function translate_solution(node; epsilon=1e-4)
 
-    println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
+    # println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
 
     translated_solution = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
