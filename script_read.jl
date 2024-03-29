@@ -1,9 +1,9 @@
 include("bpc.jl")
 include("data.jl")
 
-# J, w, E, W = read_file("toy.txt")
+J, w, E, W = read_file("test/toy.txt")
 # J, w, E, W = read_file("toy2.txt")
-J, w, E, W = read_file("BPWC_0_6_8.txt") 
+# J, w, E, W = read_file("BPWC_0_6_8.txt") 
 
 println("J: $(J)\nw: $(w)\nW: $(W)\nE: $(E)")
 
