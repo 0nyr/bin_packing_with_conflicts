@@ -4,7 +4,7 @@ include("bpc.jl")
 include("data.jl")
 
 # first run to compile
-J, w, E, W = read_file("BPWC_0_6_8.txt") 
+J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
 solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
 
 
