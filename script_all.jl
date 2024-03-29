@@ -7,8 +7,6 @@ include("data.jl")
 J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
 solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
 
-
-
 # General log
 general_log_io = open("log.txt", "w+")
 logger = SimpleLogger(general_log_io)
