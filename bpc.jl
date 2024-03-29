@@ -701,9 +701,10 @@ function solve_bpc(
     while !(isempty(nodes))
 
         println(LOG_IO, "global bounds: $(bounds)")
-
-        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
-        println(LOG_IO, "node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+        if not_first_node
+            pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+            println(LOG_IO, "node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+        end
         println(LOG_IO, "node $(node.id): |J| = $(length(J))")
         println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
         println(LOG_IO, "solution: $(node.solution)")
