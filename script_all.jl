@@ -19,6 +19,7 @@ csv_table = open("time.csv", "w+")
 
 folder_path = "test"
 instances = [joinpath(folder_path, i) for i in readdir(joinpath("instances", folder_path))]
+mkpath(joinpath("logs", folder_path))
 
 for file_path in instances
 
