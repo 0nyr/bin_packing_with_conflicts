@@ -529,7 +529,7 @@ function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose
     
     # after removing the fractional item, is the new q still useful?
     if !(sum(q) > 2 - epsilon) || q ∈ S 
-        verbose >= 1 && println("integer pricing empty")
+        # verbose >= 1 && println("Integer pricing empty")
         return 1, q
     end
 
@@ -896,7 +896,7 @@ function solve_bpc(
         # run column generation with specialized pricing
         # if node.interval_graph...
 
-        # run column generation with integer pricing
+        # run column generation with rounded pricing
         m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
         if termination_status(master) == OPTIMAL
             
@@ -908,7 +908,7 @@ function solve_bpc(
             current_solution = round_up_solution(x_bar)
             current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
             
-            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
+            verbose >= 1 && println("Rounded CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
         
             # was there an improvement from the heuristic?
             if cga_ub + node.mandatory_bag_amount < node.bounds[2]
