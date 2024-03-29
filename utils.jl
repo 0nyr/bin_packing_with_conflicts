@@ -2,6 +2,8 @@ using JuMP
 using Gurobi
 using LinearAlgebra
 
+global LOG_IO = stdout
+
 "Returns set of items found in a set of addresses"
 function unmerge_bag_items(addresses, item_address)
     
@@ -93,7 +95,7 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
     item_closest = 1
 
     for q in bags_in_use
-        # println("checking integrality of $(q)")
+        # println(LOG_IO, "checking integrality of $(q)")
 
         # check lambda integrality
         d = lambda_bar[q]
@@ -109,7 +111,7 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
         else # bag is integer
             continue
         end
-        # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
+        # println(LOG_IO, "λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
 
 
         # check items integrality
@@ -127,7 +129,7 @@ function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, co
                     most_fractional_item = [q, j]  
                 end
             end
-            # println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
+            # println(LOG_IO, "x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
         end
 
     end
@@ -316,7 +318,7 @@ end
 "translates a solution, unmerging items and adding mandatory bags"
 function translate_solution(node; epsilon=1e-4)
 
-    println("mandatory_bags: $(node.mandatory_bags)")
+    println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
 
     translated_solution = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
@@ -353,7 +355,7 @@ function translate_solution(node; epsilon=1e-4)
         translated_solution[j] = mandatory_bags_binary[i]
     end
 
-    # println("translated_solution: $(translated_solution)")
+    # println(LOG_IO, "translated_solution: $(translated_solution)")
 
     return translated_solution
 end
@@ -369,7 +371,7 @@ reduced_cost(x, pi_bar, J) = 1 - sum([pi_bar[j]*x[j] for j ∈ J])
 "Utility function for retrieving master data necessary for the pricing step"
 function get_master_data_for_pricing(master, J; verbose=2)
     m_obj = objective_value(master)
-    verbose >= 2 && println("Z = $(m_obj)")
+    verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
 
     demand_constraints = get_demand_constraints(master, J)
     pi_bar = dual.(demand_constraints)
