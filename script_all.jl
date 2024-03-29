@@ -35,7 +35,7 @@ passed_time = @elapsed solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=tr
 println(LOG_IO, "solution: $(solution)\nz: $(z)")
 
 # register at general log
-@info solution "$(passed_time) seconds"
+@info z solution "$(passed_time) seconds"
 
 # save csv
 println(csv_table, "$(file_name), $(passed_time)")
