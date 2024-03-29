@@ -708,7 +708,6 @@ function solve_bpc(
         println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
         println(LOG_IO, "solution: $(node.solution)")
         println(LOG_IO, "item_address: $(node.item_address)")
-        
         println(LOG_IO, "\n")
 
 
