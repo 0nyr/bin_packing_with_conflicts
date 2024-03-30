@@ -1,6 +1,7 @@
 using JuMP
 using Gurobi
 using LinearAlgebra
+using Logging
 
 global LOG_IO = stdout
 
@@ -362,7 +363,7 @@ end
 
 "transforms solution structure from binary, same length arrays to integer, variable length arrays"
 function get_pretty_solution(bags, bags_amount; epsilon=1e-4)
-    return Vector{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
+    return Vector{Int64}[ Int64[j for j in 1:length(bags[i]) if bags[i][j] > 0] for i in 1:bags_amount ]
 end
 
 get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]
