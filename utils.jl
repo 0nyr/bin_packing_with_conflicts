@@ -256,8 +256,6 @@ function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
     if isempty(excess) # no items to prune
         return solution, length(solution)
     end
-
-    println("pruning excess!")
     
     # get location of all excesses
     bag_i = 0
