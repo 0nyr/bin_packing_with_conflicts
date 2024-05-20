@@ -853,6 +853,7 @@ function solve_bpc(
         # build master
         # master = Model(Gurobi.Optimizer)
         master = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
+        #  set_time_limit_sec(master, 600)
         set_silent(master)
         
         # add the naive solution as lambda variables (can serve as artificial variables)
