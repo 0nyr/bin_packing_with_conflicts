@@ -654,6 +654,7 @@ function solve_bpc(
     E::Vector{Vector{Int64}}, 
     w::Vector{Int64}, 
     W::Int64; 
+    time_limit::Int64=600,
     verbose::Int64=1, 
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
@@ -697,8 +698,16 @@ function solve_bpc(
 
     node = nodes[1]
 
+    start_time = time()
+
     # Start the tree
     while !(isempty(nodes))
+
+        if time() - start_time >= time_limit
+            println(LOG_IO, "out of time")
+            break
+        end
+
 
         println(LOG_IO, "global bounds: $(bounds)")
         if not_first_node

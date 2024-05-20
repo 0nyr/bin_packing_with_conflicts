@@ -41,7 +41,7 @@ for file_path in instances
     
     # solve and get time elapsed
     println(LOG_IO, "J: $(J)\nw: $(w)\nW: $(W)\nE: $(E)")
-    passed_time = @elapsed solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
+    passed_time = @elapsed solution, z = solve_bpc(J, E, w, W, time_limit=600, verbose=0, run_ffd=true, max_iter=10000)
     println(LOG_IO, "solution: $(solution)\nz: $(z)")
     
     # register at general log
