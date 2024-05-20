@@ -700,11 +700,14 @@ function solve_bpc(
 
     start_time = time()
 
+    is_optimal = true
+
     # Start the tree
     while !(isempty(nodes))
 
         if time() - start_time >= time_limit
             println(LOG_IO, "out of time")
+            is_optimal = false
             break
         end
 
@@ -1050,5 +1053,5 @@ function solve_bpc(
     println(LOG_IO, "node.bounds: $(node.bounds)")
     println(LOG_IO, "node.bounds_status: $(node.bounds_status)")
 
-    return final_solution, bounds[2]
+    return final_solution, bounds[2], is_optimal
 end
