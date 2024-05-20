@@ -46,10 +46,14 @@ for file_path in instances
     
     # register at general log
     @info z solution "$(passed_time) seconds"
+    # println("$(passed_time) seconds")
     
     # save csv
     instance_name = basename(file_path)[1:end-4]
     println(csv_table, "$(instance_name), $(passed_time)")
+
+    flush(LOG_IO)
+    flush(csv_table)
 end
 
 # Close the file
