@@ -256,6 +256,8 @@ function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
     if isempty(excess) # no items to prune
         return solution, length(solution)
     end
+
+    println("pruning excess!")
     
     # get location of all excesses
     bag_i = 0
@@ -272,7 +274,7 @@ function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
     end
 
     # remove item from bags, prioritizing the most heavy bags
-    bags_weights = Int64[sum([w[j] for j in bag]) for bag in solution]
+    bags_weights = Int64[sum([w[j] for (j, value) in enumerate(bag) if value > .5]) for bag in solution]
     for j in excess
 
         # sort relevant bags by most empty first

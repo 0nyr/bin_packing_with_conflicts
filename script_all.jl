@@ -3,10 +3,15 @@ using Logging
 include("bpc.jl")
 include("data.jl")
 
+do_compile_run = false
+# do_compile_run = true
+
 # first run to compile
-println("COMPILE RUN\n\n")
-J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
-solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
+if do_compile_run
+    println("DOING COMPILE RUN\n\n")
+    J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
+    solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
+end
 
 # General log
 general_log_io = open("log.txt", "w+")
@@ -18,8 +23,8 @@ csv_table = open("time.csv", "w+")
 
 
 # Files
-# folder_path = "test"
-folder_path = "Elhedhli"
+folder_path = "test"
+# folder_path = "Elhedhli"
 instances = [joinpath(folder_path, i) for i in readdir(joinpath("instances", folder_path))]
 mkpath(joinpath("logs", folder_path))
 
