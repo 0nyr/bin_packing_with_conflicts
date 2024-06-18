@@ -37,7 +37,7 @@ for (i, j) in translated_E
     binarized_E[j][i] = true
 end
 
-buckets = Vector{Vector{Label}}[Label[ Label(c[i], 0) ] for i in 1:len_J]
+buckets = Vector{Vector{Label}}[Label[ Label(c[i], 0, deepcopy(binarized_E[i])) ] for i in 1:len_J]
 
 
 
