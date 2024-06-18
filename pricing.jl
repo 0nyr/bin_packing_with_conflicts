@@ -27,6 +27,29 @@ function Base.isless(l1::Label, l2::Label)
     end
 end
 
+
+# base data
+
+# reduced costs
+c = []
+
+len_J = 10
+
+buckets = Vector{Vector{Label}}[Label[ Label(c[i], ) ] for i in 1:len_J]
+
+
+
+
+for bucket in buckets
+
+
+end
+
+
+
+
+
+
 mat = Matrix{Vector{Label}}(undef, Q+1, length(N))
 
 # reset the matrix
