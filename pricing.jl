@@ -1,41 +1,43 @@
 struct Label
     rcost::Float64 
-    alpha::Int
-    beta::Int
-    last_arc::Vector{Int} # last arc in the route, in the (entry, exit) format
-    prev_lab::Vector{Label} # last label
+    previous::Int64 # last bucket
+    next_conflics::BitVector # conflics that will be found by moving forward
+
+    # last_arc::Vector{Int} # last arc in the route, in the (entry, exit) format
+    # prev_lab::Vector{Label} # last label
 end
 
 "Returns true if l1 dominates l2"
 function Base.isless(l1::Label, l2::Label)
 
-    strict = Bool[
-        l1.rcost < l2.rcost,
-        l1.alpha < l2.alpha,
-        l1.beta < l2.beta,
-    ]
+    # l1 dominates l2 if:
+    #   the possibilities set of l1 *at least contains* the possibilities set of l2
+    #   l1 has smaller reduced cost
 
-    if !(any(strict))
-        return false
+    if l1.rcost < l2.rcost
+        return all(l1.next_conflics .<= l2.next_conflics)
     else
-        nonstrict = Bool[
-            l1.rcost <= l2.rcost,
-            l1.alpha <= l2.alpha,
-            l1.beta <= l2.beta,
-        ]
-        return all(nonstrict)
+        return false
     end
 end
 
 
 # base data
+len_J = 10
 
 # reduced costs
 c = []
 
-len_J = 10
+# binarized_E[i][j] = 1 if (i, j) ∈ E
+# binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
+binarized_E = BitVector[BitVector(undef, len_J) for i in 1:len_J]
 
-buckets = Vector{Vector{Label}}[Label[ Label(c[i], ) ] for i in 1:len_J]
+for (i, j) in translated_E
+    binarized_E[i][j] = true
+    binarized_E[j][i] = true
+end
+
+buckets = Vector{Vector{Label}}[Label[ Label(c[i], 0) ] for i in 1:len_J]
 
 
 
