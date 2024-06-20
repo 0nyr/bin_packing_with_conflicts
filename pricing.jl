@@ -64,7 +64,7 @@ for (i, j) in translated_E
     binarized_E[j][i] = true
 end
 
-buckets = Vector{Vector{Label}}[Label[] for i in J]
+buckets = Vector{Label}[Label[] for i in J]
 
 to_extend = BinaryMinHeap{Label}()
 for i in 1:len_J
@@ -105,12 +105,17 @@ while !isempty(to_extend)
             continue
         end
 
+        println("here")
+        new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
+        println(new_next_conflicts)
+
         new_label = Label(
             curr_label.rcost + rc[i], 
             new_weight, 
             i, 
             Label[curr_label], 
-            curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+            new_next_conflicts,
+            # curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
         )
 
 
