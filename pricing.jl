@@ -82,9 +82,10 @@ for i in 1:len_J
 end
 
 trash = Dict{Label, Nothing}()
-
 while !isempty(to_extend)
     curr_label = pop!(to_extend)
+
+    println(curr_label)
 
     # if the label is marked for deletion, delete and continue
     if haskey(trash, curr_label)
