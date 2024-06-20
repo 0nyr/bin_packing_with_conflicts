@@ -45,9 +45,10 @@ translated_E = []
 for k in 1:rand(1:len_J*(len_J-1)/2)
     i = rand(1:len_J-1)
     j = rand(i+1:len_J)
-
     push!(translated_E, [i,j])
 end
+
+
 
 # binarized_E[i][j] = 1 if (i, j) ∈ E
 # binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
