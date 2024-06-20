@@ -33,18 +33,18 @@ len_J = 10
 J = [i for i in 1:len_J]
 
 # reduced costs
-rc = [i for i in J]
+# rc = [i for i in J]
+rc = rand(-10:10, 10)
 
-
-positive_rcost = Bool[i > 0 for i in c]
-
+positive_rcost = Bool[i > 0 for i in rc]
 
 w = [i*10 for i in J]
 W = 120
 
 # binarized_E[i][j] = 1 if (i, j) ∈ E
 # binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
-binarized_E = BitVector[BitVector(undef, len_J) for i in J]
+# binarized_E = BitVector[BitVector(undef, len_J) for i in J]
+binarized_E = BitVector[falses(len_J) for i in J]
 
 
 for (i, j) in translated_E
@@ -55,11 +55,14 @@ end
 buckets = Vector{Vector{Label}}[Label[] for i in J]
 
 to_extend = BinaryMinHeap{Label}()
-for i in 1:len_J-1
-    label = Label(c[i], w[i], 0, Label[], deepcopy(binarized_E[i][i+1:end]))
+for i in 1:len_J
+    label = Label(c[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
 
-    push!(to_extend, label)
     push!(buckets[i], label)
+
+    if i < len_J
+        push!(to_extend, label)
+    end
 end
 
 trash = Dict{Label, Nothing}()
@@ -133,14 +136,33 @@ while !isempty(to_extend)
     end
 end
 
-
-
-
-# check dominated
+min_rcost = Inf
+best_label = nothing
 for bucket in buckets
-
-
+    for label in bucket
+        if label.rcost < min_rcost
+            min_rcost = label.rcost
+            best_label = label
+        end
+    end
 end
+
+new_bin = falses(len_J)
+if min_rcost > 0 && min_rcost < Inf
+    label = best_label
+    
+    done = false
+    while !done
+        if isempty(label.prev_lab) 
+            done = true
+        else
+            new_bin[label.last_item_added] = true
+            label = label.prev_lab[1]
+        end
+    end
+end
+
+
 
 
 
