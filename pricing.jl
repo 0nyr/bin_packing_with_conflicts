@@ -49,7 +49,10 @@ for k in 1:rand(1:len_J*(len_J-1)/2)
     j = rand(i+1:len_J)
     push!(translated_E, [i,j])
 end
+sort!(translated_E)
 
+println(translated_E)
+println(rc)
 
 
 # binarized_E[i][j] = 1 if (i, j) ∈ E
@@ -72,7 +75,8 @@ for i in 1:len_J
         continue
     end
 
-    label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
+    # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
+    label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
 
     push!(buckets[i], label)
 
@@ -82,7 +86,11 @@ for i in 1:len_J
 end
 
 trash = Dict{Label, Nothing}()
+println("starting extensions")
 while !isempty(to_extend)
+
+    println(to_extend)
+
     curr_label = pop!(to_extend)
 
     println(curr_label)
@@ -107,7 +115,9 @@ while !isempty(to_extend)
         end
 
         println("here")
-        new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
+        # new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
+        new_next_conflicts = deepcopy(curr_label.next_conflics)
+        new_next_conflicts[i+1:end] =  curr_label.next_conflics[i+1:end] .|| binarized_E[i][i+1:end]
         println(new_next_conflicts)
 
         new_label = Label(
@@ -184,8 +194,6 @@ if min_rcost > 0 && min_rcost < Inf
     end
 end
 
-println(E)
-println(rc)
 println(min_rcost)
 println(new_bin)
 
