@@ -1,7 +1,9 @@
 struct Label
     rcost::Float64 
-    previous::Int64 # last bucket
-    next_conflics::BitVector # conflics that will be found by moving forward
+    weight::Int64 # current weight
+    last_item_added::Int # item added in this label
+    prev_lab::Vector{Label} # last label
+    next_conflics::BitVector # conflics that will be found by moving forward (includes weight conflicts)
 
     # last_arc::Vector{Int} # last arc in the route, in the (entry, exit) format
     # prev_lab::Vector{Label} # last label
@@ -14,8 +16,12 @@ function Base.isless(l1::Label, l2::Label)
     #   the possibilities set of l1 *at least contains* the possibilities set of l2
     #   l1 has smaller reduced cost
 
-    if l1.rcost < l2.rcost
-        return all(l1.next_conflics .<= l2.next_conflics)
+    if l1.weight <= l2.weight
+        if l1.rcost <= l2.rcost
+            return all(l1.next_conflics .<= l2.next_conflics)
+        else
+            return false
+        end
     else
         return false
     end
@@ -24,24 +30,113 @@ end
 
 # base data
 len_J = 10
+J = [i for i in 1:len_J]
 
 # reduced costs
-c = []
+rc = [i for i in J]
+
+
+positive_rcost = Bool[i > 0 for i in c]
+
+
+w = [i*10 for i in J]
+W = 120
 
 # binarized_E[i][j] = 1 if (i, j) ∈ E
 # binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
-binarized_E = BitVector[BitVector(undef, len_J) for i in 1:len_J]
+binarized_E = BitVector[BitVector(undef, len_J) for i in J]
+
 
 for (i, j) in translated_E
     binarized_E[i][j] = true
     binarized_E[j][i] = true
 end
 
-buckets = Vector{Vector{Label}}[Label[ Label(c[i], 0, deepcopy(binarized_E[i])) ] for i in 1:len_J]
+buckets = Vector{Vector{Label}}[Label[] for i in J]
+
+to_extend = BinaryMinHeap{Label}()
+for i in 1:len_J-1
+    label = Label(c[i], w[i], 0, Label[], deepcopy(binarized_E[i][i+1:end]))
+
+    push!(to_extend, label)
+    push!(buckets[i], label)
+end
+
+trash = Dict{Label, Nothing}()
+
+while !isempty(to_extend)
+    curr_label = pop!(to_extend)
+
+    # if the label is marked for deletion, delete and continue
+    if haskey(trash, curr_label)
+        delete!(trash, curr_label)
+        continue
+    end
+
+
+    for i in curr_label.last_item_added+1:len_J
+
+        # if the item has positive reduced cost, skip it
+        if positive_rcost[i]
+            continue
+        end
+
+        new_weight = curr_label.weight + w[i]
+        if new_weight > W
+            continue
+        end
+
+        new_label = Label(
+            curr_label.rcost + rc[i], 
+            new_weight, 
+            i, 
+            Label[curr_label], 
+            curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+        )
+
+
+
+        # check for domination
+        dominated = Dict{Label, Nothing}()
+        clean_bucket = false
+        for label in buckets[i]
+            
+            # is the new label dominated?
+            if label < new_label    
+                new_label_is_dominated = true
+                break
+            end
+
+            # does the new label dominate any label?
+            if new_label < label
+
+                # add dominated to trash
+                trash[label] = nothing
+
+                # register dominated for later deletion
+                dominated[label] = nothing
+                clean_matrix = true
+            end
+        end
+
+        # remove the labels dominated by the new label, if necessary
+        if clean_matrix
+            deleteat!(buckets[i], findall(x -> x in keys(dominated), buckets[i]))
+        end
+
+        if new_label_is_dominated
+            continue
+        else # if the new label isn't dominated
+            push!(buckets[i], new_label)
+            push!(to_extend, new_label)
+        end 
+    end
+end
 
 
 
 
+# check dominated
 for bucket in buckets
 
 
