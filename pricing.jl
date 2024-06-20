@@ -60,139 +60,149 @@ println(rc)
 # binarized_E = BitVector[BitVector(undef, len_J) for i in J]
 binarized_E = BitVector[falses(len_J) for i in J]
 
+function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
 
-
-for (i, j) in translated_E
-    binarized_E[i][j] = true
-    binarized_E[j][i] = true
-end
-
-buckets = Vector{Label}[Label[] for i in J]
-
-to_extend = BinaryMinHeap{Label}()
-for i in 1:len_J
-    if positive_rcost[i]
-        continue
+    for i in J
+        binarized_E[i] .= false
     end
 
-    # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
-    label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-
-    push!(buckets[i], label)
-
-    if i < len_J
-        push!(to_extend, label)
-    end
-end
-
-trash = Dict{Label, Nothing}()
-println("starting extensions")
-while !isempty(to_extend)
-
-    println(to_extend)
-
-    curr_label = pop!(to_extend)
-
-    println(curr_label)
-
-    # if the label is marked for deletion, delete and continue
-    if haskey(trash, curr_label)
-        delete!(trash, curr_label)
-        continue
+    for (i, j) in translated_E
+        binarized_E[i][j] = true
+        binarized_E[j][i] = true
     end
 
+    buckets = Vector{Label}[Label[] for i in J]
 
-    for i in curr_label.last_item_added+1:len_J
-
-        # if the item has positive reduced cost, skip it
+    to_extend = BinaryMinHeap{Label}()
+    for i in 1:len_J
         if positive_rcost[i]
             continue
         end
 
-        new_weight = curr_label.weight + w[i]
-        if new_weight > W
+        # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
+        label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
+
+        push!(buckets[i], label)
+
+        if i < len_J
+            push!(to_extend, label)
+        end
+    end
+
+    trash = Dict{Label, Nothing}()
+    println("starting extensions")
+    while !isempty(to_extend)
+
+        println(to_extend)
+
+        curr_label = pop!(to_extend)
+
+        println(curr_label)
+
+        # if the label is marked for deletion, delete and continue
+        if haskey(trash, curr_label)
+            delete!(trash, curr_label)
             continue
         end
 
-        println("here")
-        # new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
-        new_next_conflicts = deepcopy(curr_label.next_conflics)
-        new_next_conflicts[i+1:end] =  curr_label.next_conflics[i+1:end] .|| binarized_E[i][i+1:end]
-        println(new_next_conflicts)
 
-        new_label = Label(
-            curr_label.rcost + rc[i], 
-            new_weight, 
-            i, 
-            Label[curr_label], 
-            new_next_conflicts,
-            # curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
-        )
+        for i in curr_label.last_item_added+1:len_J
 
-
-
-        # check for domination
-        dominated = Dict{Label, Nothing}()
-        clean_bucket = false
-        for label in buckets[i]
-            
-            # is the new label dominated?
-            if label < new_label    
-                new_label_is_dominated = true
-                break
+            # if the item has positive reduced cost, skip it
+            if positive_rcost[i]
+                continue
             end
 
-            # does the new label dominate any label?
-            if new_label < label
+            new_weight = curr_label.weight + w[i]
+            if new_weight > W
+                continue
+            end
 
-                # add dominated to trash
-                trash[label] = nothing
+            println("here")
+            # new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
+            new_next_conflicts = deepcopy(curr_label.next_conflics)
+            new_next_conflicts[i+1:end] =  curr_label.next_conflics[i+1:end] .|| binarized_E[i][i+1:end]
+            println(new_next_conflicts)
 
-                # register dominated for later deletion
-                dominated[label] = nothing
-                clean_matrix = true
+            new_label = Label(
+                curr_label.rcost + rc[i], 
+                new_weight, 
+                i, 
+                Label[curr_label], 
+                new_next_conflicts,
+                # curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+            )
+
+
+
+            # check for domination
+            dominated = Dict{Label, Nothing}()
+            clean_bucket = false
+            clean_matrix = false
+            new_label_is_dominated = false
+            for label in buckets[i]
+                
+                # is the new label dominated?
+                if label < new_label    
+                    new_label_is_dominated = true
+                    break
+                end
+
+                # does the new label dominate any label?
+                if new_label < label
+
+                    # add dominated to trash
+                    trash[label] = nothing
+
+                    # register dominated for later deletion
+                    dominated[label] = nothing
+                    clean_matrix = true
+                end
+            end
+
+            # remove the labels dominated by the new label, if necessary
+            if clean_matrix
+                deleteat!(buckets[i], findall(x -> x in keys(dominated), buckets[i]))
+            end
+
+            if new_label_is_dominated
+                continue
+            else # if the new label isn't dominated
+                push!(buckets[i], new_label)
+                push!(to_extend, new_label)
+            end 
+        end
+    end
+
+    min_rcost = Inf
+    best_label = nothing
+    for bucket in buckets
+        for label in bucket
+            if label.rcost < min_rcost
+                min_rcost = label.rcost
+                best_label = label
             end
         end
-
-        # remove the labels dominated by the new label, if necessary
-        if clean_matrix
-            deleteat!(buckets[i], findall(x -> x in keys(dominated), buckets[i]))
-        end
-
-        if new_label_is_dominated
-            continue
-        else # if the new label isn't dominated
-            push!(buckets[i], new_label)
-            push!(to_extend, new_label)
-        end 
     end
-end
 
-min_rcost = Inf
-best_label = nothing
-for bucket in buckets
-    for label in bucket
-        if label.rcost < min_rcost
-            min_rcost = label.rcost
-            best_label = label
+    new_bin = falses(len_J)
+    if min_rcost > 0 && min_rcost < Inf
+        label = best_label
+        
+        done = false
+        while !done
+            if isempty(label.prev_lab) 
+                done = true
+            else
+                new_bin[label.last_item_added] = true
+                label = label.prev_lab[1]
+            end
         end
     end
+    return min_rcost, best_label
 end
 
-new_bin = falses(len_J)
-if min_rcost > 0 && min_rcost < Inf
-    label = best_label
-    
-    done = false
-    while !done
-        if isempty(label.prev_lab) 
-            done = true
-        else
-            new_bin[label.last_item_added] = true
-            label = label.prev_lab[1]
-        end
-    end
-end
+min_rcost, best_label = dp_price
 
 println(min_rcost)
 println(new_bin)
