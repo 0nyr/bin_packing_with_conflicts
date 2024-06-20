@@ -202,7 +202,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
     return min_rcost, best_label
 end
 
-min_rcost, best_label = dp_price
+min_rcost, best_label = dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
 
 println(min_rcost)
 println(new_bin)
