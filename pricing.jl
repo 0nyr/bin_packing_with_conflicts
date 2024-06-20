@@ -1,3 +1,5 @@
+using DataStructures
+
 struct Label
     rcost::Float64 
     weight::Int64 # current weight
@@ -66,7 +68,11 @@ buckets = Vector{Vector{Label}}[Label[] for i in J]
 
 to_extend = BinaryMinHeap{Label}()
 for i in 1:len_J
-    label = Label(c[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
+    if positive_rcost[i]
+        continue
+    end
+
+    label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
 
     push!(buckets[i], label)
 
