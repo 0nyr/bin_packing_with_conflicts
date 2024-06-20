@@ -41,10 +41,19 @@ positive_rcost = Bool[i > 0 for i in rc]
 w = [i*10 for i in J]
 W = 120
 
+translated_E = []
+for k in 1:rand(1:len_J*(len_J-1)/2)
+    i = rand(1:len_J-1)
+    j = rand(i+1:len_J)
+
+    push!(translated_E, [i,j])
+end
+
 # binarized_E[i][j] = 1 if (i, j) ∈ E
 # binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
 # binarized_E = BitVector[BitVector(undef, len_J) for i in J]
 binarized_E = BitVector[falses(len_J) for i in J]
+
 
 
 for (i, j) in translated_E
@@ -162,6 +171,7 @@ if min_rcost > 0 && min_rcost < Inf
     end
 end
 
+println(E)
 println(rc)
 println(min_rcost)
 println(new_bin)
