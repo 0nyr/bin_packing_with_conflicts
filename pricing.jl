@@ -93,11 +93,11 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
     println("starting extensions")
     while !isempty(to_extend)
 
-        println(to_extend)
+        # println(to_extend)
 
         curr_label = pop!(to_extend)
 
-        println(curr_label)
+        # println(curr_label)
 
         # if the label is marked for deletion, delete and continue
         if haskey(trash, curr_label)
@@ -118,11 +118,11 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
                 continue
             end
 
-            println("here")
+            # println("here")
             # new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
             new_next_conflicts = deepcopy(curr_label.next_conflics)
             new_next_conflicts[i+1:end] =  curr_label.next_conflics[i+1:end] .|| binarized_E[i][i+1:end]
-            println(new_next_conflicts)
+            # println(new_next_conflicts)
 
             new_label = Label(
                 curr_label.rcost + rc[i], 
@@ -170,6 +170,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
             else # if the new label isn't dominated
                 push!(buckets[i], new_label)
                 push!(to_extend, new_label)
+                println(new_label)
             end 
         end
     end
@@ -185,13 +186,15 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E)
         end
     end
 
+    println("best label: ", best_label)
+
     new_bin = falses(len_J)
-    if min_rcost > 0 && min_rcost < Inf
+    if min_rcost < 0 && min_rcost < Inf
         label = best_label
         
         done = false
         while !done
-            if isempty(label.prev_lab) 
+            if isempty(label.prev_lab)
                 done = true
             else
                 new_bin[label.last_item_added] = true
