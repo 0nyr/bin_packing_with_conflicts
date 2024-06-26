@@ -166,194 +166,49 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W;
 end
 
 
-# base data
-len_J = 10
-J = [i for i in 1:len_J]
+# # base data
+# len_J = 10
+# J = [i for i in 1:len_J]
 
-# reduced costs
-# rc = [i for i in J]
-rc = rand(-10:10, 10)
+# # reduced costs
+# # rc = [i for i in J]
+# rc = rand(-10:10, 10)
 
-positive_rcost = Bool[i > 0 for i in rc]
+# positive_rcost = Bool[i > 0 for i in rc]
 
-w = [i*10 for i in J]
-W = 120
+# w = [i*10 for i in J]
+# W = 120
 
-translated_E = []
-for k in 1:rand(1:len_J*(len_J-1)/2)
-    i = rand(1:len_J-1)
-    j = rand(i+1:len_J)
-    push!(translated_E, [i,j])
-end
-sort!(translated_E)
+# translated_E = []
+# for k in 1:rand(1:len_J*(len_J-1)/2)
+#     i = rand(1:len_J-1)
+#     j = rand(i+1:len_J)
+#     push!(translated_E, [i,j])
+# end
+# sort!(translated_E)
 
-println(translated_E)
-println(rc)
+# println(translated_E)
+# println(rc)
 
+# # binarized_E[i][j] = 1 if (i, j) ∈ E
+# # binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
+# # binarized_E = BitVector[BitVector(undef, len_J) for i in J]
+# binarized_E = BitVector[falses(len_J) for i in J]
 
-# binarized_E[i][j] = 1 if (i, j) ∈ E
-# binarized_E = Vector{Int64}[Int64[0 for j in 1:len_J] for i in 1:len_J]
-# binarized_E = BitVector[BitVector(undef, len_J) for i in J]
-binarized_E = BitVector[falses(len_J) for i in J]
-
-for i in J
-    binarized_E[i] .= false
-end
-
-for (i, j) in translated_E
-    binarized_E[i][j] = true
-    binarized_E[j][i] = true
-end
-
-min_rcost, new_bin = dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W)
-
-println(min_rcost)
-println(new_bin)
-
-
-
-
-
-
-
-# mat = Matrix{Vector{Label}}(undef, Q+1, length(N))
-
-# # reset the matrix
-# for c in N
-#     for alpha in 0:Q 
-#         mat[alpha+1,c-1] = Label[]
-#     end
+# for i in J
+#     binarized_E[i] .= false
 # end
 
-# to_extend = BinaryMinHeap{Label}()
-# for c in N
-#     d = delivery(data, c)
-#     p = pickup(data, c)
-
-#     alpha = p
-#     beta = max(d, alpha)
-
-#     label = Label(costs[1,c], alpha, beta, Int[1, c], Label[])
-#     push!(to_extend, label)
-#     push!(mat[alpha+1, c-1], label)
+# for (i, j) in translated_E
+#     binarized_E[i][j] = true
+#     binarized_E[j][i] = true
 # end
 
-# trash = Dict{Label, Nothing}()
+# min_rcost, new_bin = dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W)
 
-# while !isempty(to_extend)
-#     curr_label = pop!(to_extend)
+# println(min_rcost)
+# println(new_bin)
 
-#     if haskey(trash, curr_label)
-#         delete!(trash, curr_label)
-#         continue
-#     end
-    
-#     for c in N
-#         if c == curr_label.last_arc[2]
-#             continue
-#         end
 
-#         alpha = curr_label.alpha + pickup(data, c)
-#         if alpha > Q
-#             continue
-#         end
-        
-#         beta = max(curr_label.beta + delivery(data, c), alpha) 
-#         if beta > Q
-#             continue
-#         end
 
-#         rcost = curr_label.rcost + costs[curr_label.last_arc[2], c]
-        
-#         # It will become an loop in the list of labels
-#         new_label = Label(rcost, alpha, beta, Int[curr_label.last_arc[2], c], Label[curr_label])
-
-#         new_label_is_dominated = false
-
-#         # check for domination
-#         dominated = Dict{Label, Nothing}()
-#         clean_matrix = false
-#         for label in mat[alpha+1, c-1]
-            
-#             # is the new label dominated?
-#             if label < new_label    
-#                 new_label_is_dominated = true
-#                 break
-#             end
-
-#             # does the new label dominate any label?
-#             if new_label < label
-
-#                 # add dominated to trash
-#                 trash[label] = nothing
-
-#                 # register dominated for later deletion
-#                 dominated[label] = nothing
-#                 clean_matrix = true
-#             end
-#         end
-
-#         # remove the labels dominated by the new label, if necessary
-#         if clean_matrix
-#             deleteat!(mat[alpha+1, c-1], findall(x -> x in keys(dominated), mat[alpha+1, c-1]))
-#         end
-
-#         if new_label_is_dominated
-#             continue
-#         else # if the new label isn't dominated
-#             push!(mat[alpha+1, c-1], new_label)
-#             push!(to_extend, new_label)
-#         end
-#     end
-# end
-
-# min_rcost = Inf
-# sols = Tuple{Float64, Vector{JuMP.VariableRef}, Vector{Float64}}[]
-# for c in N
-#     for alpha in 0:Q
-#         for label in mat[alpha+1, c-1]
-#             sol = Dict{Tuple{Int, Int}, Int}()
-
-#             # from the current vertex, go backwards until the depot is reached
-#             done = false
-#             curlabel = label
-#             while !done # stop at the begginning
-#                 arc = tuple(curlabel.last_arc...)
-#                 sol[arc] = get(sol, arc, 0) + 1                        
-                
-#                 if arc[1] == 1
-#                     done = true
-#                 else
-#                     curlabel = curlabel.prev_lab[1] # it's a reference contained in an array
-#                 end
-#             end
-
-#             # add final arc, finishing the route 
-#             arc = (c, 1)
-#             sol[arc] = get(sol, arc, 0) + 1
-
-#             # get route reduced cost, and compare with global minimum
-#             rcost = label.rcost + costs[c, 1]
-#             min_rcost = min(min_rcost, rcost)
-#             # @show rcost, sol
-            
-#             # Create the solution (send only variables with non-zero values)
-#             solvars = JuMP.VariableRef[]
-#             solvals = Float64[]
-#             for (arc, val) in sol
-#                 push!(solvars, x[spid, arc])
-#                 push!(solvals, val)
-#             end
-        
-#             push!(sols, (rcost, solvars, solvals))
-#         end
-#     end
-# end
-# @show min_rcost
-# sort!(sols, by = x -> x[1])
-# for sol in sols
-#     @show sol
-#     MOI.submit(cvrp, BD.PricingSolution(cbdata), sol...)
-#     break
-# end
 
