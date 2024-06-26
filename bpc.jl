@@ -3,6 +3,7 @@ using Gurobi
 using LinearAlgebra
 
 include("utils.jl")
+inlcude("pricing.jl")
 
 const GUROBI_ENV = Gurobi.Env()
 
@@ -537,11 +538,21 @@ function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose
     return p_obj, q
 end
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
     
     m_obj = Inf
 
     # global print_once = [false]
+
+    if using_dp
+        len_J = length(J)
+        binarized_E = BitVector[falses(len_J) for i in J]
+
+        for (i, j) in E
+            binarized_E[i][j] = true
+            binarized_E[j][i] = true
+        end
+    end
 
     # run price, add new columns, check solution, repeat if necessary
     iteration = 1
@@ -560,7 +571,12 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, verbose=verbose)
         
         # run price lp
-        p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
+        if using_dp
+            positive_rcost = Bool[i > 0 for i in pi_bar]
+            p_obj, q = dp_price(J, len_J, positive_rcost, w, binarized_E, E, W, verbose=verbose, epsilon=epsilon)
+        else
+            p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
+        end
 
         if p_obj < -epsilon
 
