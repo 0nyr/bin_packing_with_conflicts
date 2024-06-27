@@ -3,7 +3,7 @@ using Gurobi
 using LinearAlgebra
 
 include("utils.jl")
-inlcude("pricing.jl")
+include("pricing.jl")
 
 const GUROBI_ENV = Gurobi.Env()
 
