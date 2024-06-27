@@ -101,14 +101,15 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     _, i_index = findmax(x -> w[x], available_to_merge)
     i = available_to_merge[i_index]
 
+    println(LOG_IO, "rf branching on items $(i) and $(j)")
 
     # make child
     # pos_child = deepcopy(node)
-    node_counter[1] += 1
+    # node_counter[1] += 1
     pos_child = Node(
-        node_counter[1], # id
+        node_counter[1]+1, # id
         # 1*node.priority,
-        length(node.J)-1,
+        length(node.J)+length(node.E)-1,
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -131,17 +132,16 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
 
     # Adding positive child to list
     push!(nodes, pos_child)
-    # println(LOG_IO, "added node $(pos_child.id) to list")            
+    println(LOG_IO, "added node $(pos_child.id) to list")            
 
-    println(LOG_IO, "rf branching on items $(i) and $(j)")
 
     # split branch
     # neg_child = deepcopy(node)
-    node_counter[1] += 1
+    # node_counter[1] += 1
     neg_child = Node(
-        node_counter[1], # id
+        node_counter[1]+2, # id
         # 1*node.priority,
-        length(node.J),
+        length(node.J)+length(node.E)+1,
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -158,26 +158,26 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
     
-    println(LOG_IO, "i: $(i), j: $(j), $(node.item_address)")
-    println(LOG_IO, node.w)
+    # println(LOG_IO, "i: $(i), j: $(j), $(node.item_address)")
+    # println(LOG_IO, node.w)
 
     # E stores conflicts in terms of the original graph
     i = unmerge_bag_items([i], node.item_address)[1]
     j = unmerge_bag_items([j], node.item_address)[1]
     
-    println(LOG_IO, "item_address: $(neg_child.item_address)")
-    println(LOG_IO, "E before: $(neg_child.E)")
+    # println(LOG_IO, "item_address: $(neg_child.item_address)")
+    # println(LOG_IO, "E before: $(neg_child.E)")
 
     if sort([i, j]) ∈ neg_child.E
         error()
     end
 
     push!(neg_child.E, sort([i,j]))
-    println(LOG_IO, "E now: $(neg_child.E)")
+    # println(LOG_IO, "E now: $(neg_child.E)")
 
     # Adding negative child to list
     push!(nodes, neg_child)
-    # println(LOG_IO, "added node $(neg_child.id) to list")
+    println(LOG_IO, "added node $(neg_child.id) to list")
 end
 
 "removes items in q from J, w and E, updating addresses as necessary"
