@@ -68,8 +68,13 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
 
         for i in curr_label.last_item_added+1:len_J
 
-            # if the item has positive reduced cost, skip it
+            # if the item has negative reduced cost, skip it
             if !positive_rcost[i]
+                continue
+            end
+
+            # if the item is in conflict with the label, skip it
+            if curr_label.next_conflics[i]
                 continue
             end
 

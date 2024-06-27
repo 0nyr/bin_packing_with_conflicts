@@ -562,7 +562,13 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         if p_obj < -epsilon
 
             # price
-            verbose >= 3 && println(LOG_IO, "adding lambda: $(q)")
+            verbose >= 3 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(q)")
+            if using_dp
+                println(LOG_IO, "p_obj: $(p_obj), adding lambda: $([i for (i, j) in enumerate(q) if j > .5])")
+                chk_obj, chk_bin = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=0, epsilon=epsilon)
+                chk_bin = [i for (i, j) in enumerate(chk_bin) if j > .5]
+                println(LOG_IO, "comparing to mip: $(chk_obj) $(chk_bin)")
+            end
 
             # add new packing scheme to list
             push!(S, q)
