@@ -146,7 +146,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W;
         end
     end
 
-    println("best label: ", best_label)
+    # println("best label: ", best_label)
 
     new_bin = falses(len_J)
     if min_rcost < -epsilon && min_rcost < Inf
@@ -162,6 +162,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W;
             end
         end
     end
+    println("new_bin: $(new_bin)")
     return min_rcost, new_bin
 end
 

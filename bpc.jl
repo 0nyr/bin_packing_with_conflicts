@@ -473,7 +473,7 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     return p_obj, value.(price[:x])
 end
 
-"Runs relaxed pricing linear programming, but constrains the new lambda to be integer"
+"Runs relaxed pricing linear programming, but constrains the new bin to be integer"
 function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
@@ -554,7 +554,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
-            p_obj, q = dp_price(J, len_J, positive_rcost, w, binarized_E, E, W, verbose=verbose, epsilon=epsilon)
+            p_obj, q = dp_price(J, len_J, pi_bar, positive_rcost, w, binarized_E, E, W, verbose=verbose, epsilon=epsilon)
         else
             p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
         end
@@ -907,7 +907,7 @@ function solve_bpc(
         # run column generation with specialized pricing
         # if node.interval_graph...
 
-        # run column generation with rounded pricing
+        # run column generation with rounded pricing lp (effectively a heuristic)
         m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
         if termination_status(master) == OPTIMAL
             
@@ -948,7 +948,8 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
+        # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
+        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
         if termination_status(master) != OPTIMAL
             println(LOG_IO, "node $(node.id) linear programming failed to optimize")
             break
@@ -1007,6 +1008,7 @@ function solve_bpc(
             println(LOG_IO, "q: $(q)")
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
+            node_counter[1] += 2
 
         else # the solution is integer!
 
