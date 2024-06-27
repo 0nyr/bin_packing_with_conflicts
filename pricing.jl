@@ -5,10 +5,8 @@ struct Label
     weight::Int64 # current weight
     last_item_added::Int # item added in this label
     prev_lab::Vector{Label} # last label
-    next_conflics::BitVector # conflics that will be found by moving forward (includes weight conflicts)
+    next_conflics::BitVector # conflics that will be found by moving forward
 
-    # last_arc::Vector{Int} # last arc in the route, in the (entry, exit) format
-    # prev_lab::Vector{Label} # last label
 end
 
 "Returns true if l1 dominates l2"
@@ -167,7 +165,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             end
         end
     end
-    println("new_bin: $(new_bin)")
+    # println("new_bin: $(new_bin)")
     return min_rcost, new_bin
 end
 
