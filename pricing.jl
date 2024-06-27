@@ -29,7 +29,7 @@ function Base.isless(l1::Label, l2::Label)
     end
 end
 
-function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W; verbose=3, epsilon=1e-4)
+function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, epsilon=1e-4)
 
     buckets = Vector{Label}[Label[] for i in J]
 
@@ -50,7 +50,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W;
     end
 
     trash = Dict{Label, Nothing}()
-    println("starting extensions")
+    # println("starting extensions")
     while !isempty(to_extend)
 
         # println(to_extend)
@@ -130,7 +130,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, translated_E, W;
             else # if the new label isn't dominated
                 push!(buckets[i], new_label)
                 push!(to_extend, new_label)
-                println(new_label)
+                # println(new_label)
             end 
         end
     end

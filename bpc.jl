@@ -554,7 +554,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
-            p_obj, q = dp_price(J, len_J, pi_bar, positive_rcost, w, binarized_E, E, W, verbose=verbose, epsilon=epsilon)
+            p_obj, q = dp_price(J, len_J, pi_bar, positive_rcost, w, binarized_E, W, verbose=verbose, epsilon=epsilon)
         else
             p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
         end
