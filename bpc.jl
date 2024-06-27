@@ -94,63 +94,44 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     # println(LOG_IO, "j: $(j), items_in_q: $(items_in_q)")
 
     # get items that can be merged with j
-    available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < W]
+    available_to_merge = Int64[i for i in items_in_q if i != j]
     # println(LOG_IO, "available_to_merge: $(available_to_merge)")
-    
-    
-    # is there an item such that merging with j is feasible? (w_i + w_j < W) 
-    if !(isempty(available_to_merge))
-        
-        # get largest item in bag, except the fractional item
-        _, i_index = findmax(x -> w[x], available_to_merge)
-        i = available_to_merge[i_index]
+            
+    # get largest item in bag, except the fractional item
+    _, i_index = findmax(x -> w[x], available_to_merge)
+    i = available_to_merge[i_index]
 
-        # make child
-        # pos_child = deepcopy(node)
-        node_counter[1] += 1
-        pos_child = Node(
-            node_counter[1], # id
-            # 1*node.priority,
-            length(node.J)-1,
-            deepcopy(node.J),
-            deepcopy(node.E),
-            deepcopy(node.w),
-            deepcopy(node.W),
-            Vector{Float32}[], # S
-            deepcopy(node.mandatory_bags),
-            deepcopy(node.mandatory_bag_amount),
-            deepcopy(node.forbidden_bags),
-            deepcopy(node.item_address),
-            false, # interval_graph
-            deepcopy(node.bounds), # node bounds
-            Vector{Int64}[], # solution
-            0, # bounds_status
-        )
-        pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
-        # update graph
-        J, E, w, W, S = get_node_parameters(pos_child)
-        pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
-    
-        # Adding positive child to list
-        push!(nodes, pos_child)
-        # println(LOG_IO, "added node $(pos_child.id) to list")            
-        
-    else # merging is infeasible, only create negative child, with heaviest i (higher impact on solution) 
+    # make child
+    # pos_child = deepcopy(node)
+    node_counter[1] += 1
+    pos_child = Node(
+        node_counter[1], # id
+        # 1*node.priority,
+        length(node.J)-1,
+        deepcopy(node.J),
+        deepcopy(node.E),
+        deepcopy(node.w),
+        deepcopy(node.W),
+        Vector{Float32}[], # S
+        deepcopy(node.mandatory_bags),
+        deepcopy(node.mandatory_bag_amount),
+        deepcopy(node.forbidden_bags),
+        deepcopy(node.item_address),
+        false, # interval_graph
+        deepcopy(node.bounds), # node bounds
+        Vector{Int64}[], # solution
+        0, # bounds_status
+    )
+    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
-        # get the heaviest i | i != j
-        i_weight = -Inf
-        heaviest_i = -1
-        # println(LOG_IO, "items_in_q: $(items_in_q)")
-        for i in items_in_q
-            if node.w[i] > i_weight && i != j
-                i_weight = node.w[i]
-                heaviest_i = i 
-            end
-        end
-        i = heaviest_i
+    # update graph
+    J, E, w, W, S = get_node_parameters(pos_child)
+    pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
 
-    end
+    # Adding positive child to list
+    push!(nodes, pos_child)
+    # println(LOG_IO, "added node $(pos_child.id) to list")            
 
     println(LOG_IO, "rf branching on items $(i) and $(j)")
 
@@ -999,8 +980,9 @@ function solve_bpc(
         lambda_bar = value.(lambdas)
         
         # get branching candidates
-        bags_in_use, lambdas_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
-        most_fractional_bag = make_branching_analysis(bags_in_use, lambdas_in_use, lambda_bar, S, S_len, conflicts, J, w, epsilon=1e-4)
+        bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
+        # most_fractional_bag = make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J, w, epsilon=1e-4)
+        most_fractional_bag, most_fractional_item = find_ryan_foster_branch(bags_in_use, lambda_bar, S, w, epsilon=epsilon)
 
         # println(LOG_IO, "lambda_bar: $(lambda_bar)")
         # println(LOG_IO, "bags_in_use: $(bags_in_use)")
@@ -1009,22 +991,22 @@ function solve_bpc(
 
         # is there an integer bag to branch on? 
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
-        if most_fractional_bag != -1
+        # if most_fractional_bag != -1
 
-            # get q to branch on
+        #     # get q to branch on
+        #     q = S[most_fractional_bag]
+
+        #     make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
+
+        # (Ryan and Foster branching)
+        if most_fractional_item[1] != -1
+
             q = S[most_fractional_bag]
+            j = most_fractional_item
 
-            make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
+            println(LOG_IO, "q: $(q)")
 
-        # if not, is there an item to branch on? (Ryan and Foster branching)
-        # elseif most_fractional_item[1] != -1
-
-        #     q = S[most_fractional_item[1]]
-        #     j = most_fractional_item[2]
-
-        #     println(LOG_IO, "q: $(q)")
-
-        #     make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
+            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
 
         else # the solution is integer!
 
