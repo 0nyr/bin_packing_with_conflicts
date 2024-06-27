@@ -10,7 +10,7 @@ if do_compile_run
     # first run to compile
     println("DOING COMPILE RUN\n\n")
     J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
-    solution, z = solve_bpc(J, E, w, W, verbose=3, run_ffd=true, max_iter=10000)
+    solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
 end
 
 # General log
