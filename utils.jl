@@ -88,7 +88,7 @@ function most_fractional_on_vector(v; epsilon=1e-4)
     return bound_on
 end
 
-"(needs to be fixed) Utility to find most fractional bag and most fractional item in a solution"
+"Utility to find most fractional bag and most fractional item in a solution"
 function find_most_fractional_bag_and_item(bags_in_use, lambda_bar, S, S_len, conflicts, J; epsilon=1e-4)
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
@@ -149,12 +149,12 @@ function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_in_use::Vect
     item_closest = 1
 
     # bags in use that are fractional
-    fractional_bags = Int64[]
+    # fractional_bags = Int64[]
     for q in bags_in_use
 
-        if !(isapprox(lambda_bar[q], 0, atol=epsilon)) || !(isapprox(lambda_bar[q], 1, atol=epsilon))
-            push!(fractional_bags, q)
-        end
+        # if !(isapprox(lambda_bar[q], 0, atol=epsilon)) || !(isapprox(lambda_bar[q], 1, atol=epsilon))
+        #     push!(fractional_bags, q)
+        # end
 
         d = lambda_bar[q]
         diff = lambda_bar[q] - floor(lambda_bar[q])
