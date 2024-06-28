@@ -4,8 +4,9 @@ struct Label
     rcost::Float64 # less is better
     weight::Int64 # current weight
     last_item_added::Int # item added in this label
-    prev_lab::Vector{Label} # last label
-    next_conflics::BitVector # conflics that will be found by moving forward
+    # prev_lab::Vector{Label} # last label
+    items::BitVector # items in the bin so far
+    conflicts::BitVector # conflics that will be found by moving forward
 
 end
 
@@ -18,7 +19,7 @@ function Base.isless(l1::Label, l2::Label)
 
     if l1.weight <= l2.weight
         if l1.rcost <= l2.rcost
-            return all(l1.next_conflics .<= l2.next_conflics)
+            return all(l1.conflicts .<= l2.conflicts)
         else
             return false
         end
@@ -38,7 +39,9 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
         end
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
-        label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
+        # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
+        label = Label(1-rc[i], w[i], i, falses(len_J), deepcopy(binarized_E[i]))
+        label.items[i] = true
 
         push!(buckets[i], label)
 
@@ -72,7 +75,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             end
 
             # if the item is in conflict with the label, skip it
-            if curr_label.next_conflics[i]
+            if curr_label.conflicts[i]
                 continue
             end
 
@@ -82,19 +85,22 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             end
 
             # println("here")
-            # new_next_conflicts =  curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
-            new_next_conflicts = deepcopy(curr_label.next_conflics)
-            new_next_conflicts[i+1:end] =  curr_label.next_conflics[i+1:end] .|| binarized_E[i][i+1:end]
+            # new_next_conflicts =  curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i][i+1:end]
+            new_next_conflicts = deepcopy(curr_label.conflicts)
+            new_next_conflicts[i+1:end] =  curr_label.conflicts[i+1:end] .|| binarized_E[i][i+1:end]
             # println(new_next_conflicts)
 
             new_label = Label(
                 curr_label.rcost - rc[i], 
                 new_weight, 
                 i, 
-                Label[curr_label], 
+                # Label[curr_label], 
+                deepcopy(curr_label.items), 
                 new_next_conflicts,
-                # curr_label.next_conflics[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+                # curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
             )
+
+            new_label.items[i] = true
 
 
 
@@ -151,22 +157,22 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
 
     # println("best label: ", best_label)
 
-    new_bin = falses(len_J)
-    if min_rcost < -epsilon && min_rcost < Inf
-        label = best_label
+    # new_bin = falses(len_J)
+    # if min_rcost < -epsilon && min_rcost < Inf
+    #     label = best_label
         
-        done = false
-        while !done
-            new_bin[label.last_item_added] = true
-            if isempty(label.prev_lab) # is this the last label?
-                done = true
-            else
-                label = label.prev_lab[1]
-            end
-        end
-    end
+    #     done = false
+    #     while !done
+    #         new_bin[label.last_item_added] = true
+    #         if isempty(label.prev_lab) # is this the last label?
+    #             done = true
+    #         else
+    #             label = label.prev_lab[1]
+    #         end
+    #     end
+    # end
     # println("new_bin: $(new_bin)")
-    return min_rcost, new_bin
+    return min_rcost, best_label.items
 end
 
 
