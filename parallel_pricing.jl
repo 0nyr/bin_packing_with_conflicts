@@ -10,6 +10,8 @@ struct Label
 
 end
 
+SPINLOCK = Threads.SpinLock()
+
 "Returns true if l1 dominates l2"
 function Base.isless(l1::Label, l2::Label)
 
@@ -66,7 +68,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             continue
         end
 
-        for i in curr_label.last_item_added+1:len_J
+        Threads.@threads for i in curr_label.last_item_added+1:len_J
 
             # if the item has negative reduced cost, skip it
             if !positive_rcost[i]
@@ -120,7 +122,9 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
                 if new_label < label
 
                     # add dominated to trash
-                    trash[label] = nothing
+                    Threads.lock(SPINLOCK) do 
+                        trash[label] = nothing
+                    end
 
                     # register dominated for later deletion
                     dominated[label] = nothing
@@ -130,14 +134,18 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
 
             # remove the labels dominated by the new label, if necessary
             if clean_matrix
-                deleteat!(buckets[i], findall(x -> x in keys(dominated), buckets[i]))
+                Threads.lock(SPINLOCK) do 
+                    deleteat!(buckets[i], findall(x -> x in keys(dominated), buckets[i]))
+                end
             end
 
             if new_label_is_dominated
                 continue
             else # if the new label isn't dominated
-                push!(buckets[i], new_label)
-                push!(to_extend, new_label)
+                Threads.lock(SPINLOCK) do 
+                    push!(buckets[i], new_label)
+                    push!(to_extend, new_label)
+                end
                 # println(new_label)
             end 
         end
