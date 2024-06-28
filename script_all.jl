@@ -3,6 +3,8 @@ using Logging
 include("bpc.jl")
 include("data.jl")
 
+println("starting with $(Threads.nthreads()) threads")
+
 do_compile_run = false
 do_compile_run = true
 

@@ -66,8 +66,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             continue
         end
 
-
-        for i in curr_label.last_item_added+1:len_J
+        Threads.@threads for i in curr_label.last_item_added+1:len_J
 
             # if the item has negative reduced cost, skip it
             if !positive_rcost[i]
