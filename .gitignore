@@ -8,6 +8,8 @@ logs/
 log.txt
 time.csv
 
+thread.jl
+
 instances/biginterval
 instances/Elhedhli
 instances/Malaguti
