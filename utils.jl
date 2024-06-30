@@ -1,6 +1,9 @@
 using JuMP
 using Gurobi
 using LinearAlgebra
+using Logging
+
+global LOG_IO = stdout
 
 "Returns set of items found in a set of addresses"
 function unmerge_bag_items(addresses, item_address)
@@ -85,68 +88,130 @@ function most_fractional_on_vector(v; epsilon=1e-4)
     return bound_on
 end
 
-"Utility to find most fractional integer bag and most fractional item in a solution"
-function check_solution_fractionality(bags_in_use, lambda_bar, S, S_len; epsilon=1e-4)
+"Utility to find most fractional bag and most fractional item in a solution (for ryan-foster branching)"
+function find_ryan_foster_branch(bags_in_use, lambda_bar, S, w; epsilon=1e-4)
+    
+    most_fractional_bag = -1
+    most_fractional_item = -1
+    items_in_most_fractional_bag = Int64[]
+    
+    bag_closest = 1
+    for q in bags_in_use
+        
+        items_in_q = Int64[i for (i, val) in enumerate(S[q]) if val > epsilon] 
+
+        # println(LOG_IO, "checking integrality of $(q)")
+
+        # check if there is more than one item
+        if length(items_in_q) <= 1
+            continue
+        end
+
+        # check lambda integrality
+        d = lambda_bar[q]
+        diff = d - floor(d)
+        
+        if diff > epsilon && diff < 1-epsilon
+
+            d = abs(diff - 0.5) 
+            if d < bag_closest
+                bag_closest = d
+                most_fractional_bag = q  
+                items_in_most_fractional_bag = deepcopy(items_in_q)
+            end
+        else # bag is integer
+            continue
+        end
+        # println(LOG_IO, "λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
+    end
+
+    if most_fractional_bag != -1
+
+        _, i_index = findmax(x -> w[x], items_in_most_fractional_bag)
+        most_fractional_item = items_in_most_fractional_bag[i_index]
+
+    end
+
+    return most_fractional_bag, most_fractional_item
+end
+
+"Analyze branching possibilities"
+function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float32}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float64=1e-4)
+    
+    
+    # find most fractional item (by weight) and most fractional bag 
     most_fractional_bag = -1
     most_fractional_item = [-1, -1]
     bag_closest = 1
     item_closest = 1
 
+    # bags in use that are fractional
+    # fractional_bags = Int64[]
     for q in bags_in_use
-        # println("checking integrality of $(q)")
+
+        # if !(isapprox(lambda_bar[q], 0, atol=epsilon)) || !(isapprox(lambda_bar[q], 1, atol=epsilon))
+        #     push!(fractional_bags, q)
+        # end
+
+        d = lambda_bar[q]
+        diff = lambda_bar[q] - floor(lambda_bar[q])
         
-        # check items integrality
-        is_bag_integer = true
-        for (j, x_j) in enumerate(S[q])
-
-            # d = lambda_bar[q]*x_j
-            d = x_j
-            diff = d - floor(d)
-            
-            if diff > epsilon && diff < 1-epsilon
-                is_bag_integer = false
-
-                d = abs(diff - 0.5) 
-                if d < item_closest
-                    item_closest = d
-                    most_fractional_item = [q, j]  
-                end
+        if diff > epsilon && diff < 1-epsilon
+    
+            d = abs(diff - 0.5) 
+            if d < bag_closest
+                bag_closest = d
+                most_fractional_bag = q  
             end
-            # println("x$(j): $(x_j), diff: $(diff), is_bag_integer: $(is_bag_integer)")
-        end
-
-        # check lambda integrality
-        if is_bag_integer
-            d = lambda_bar[q]
-            diff = lambda_bar[q] - floor(lambda_bar[q])
-            
-            if diff > epsilon && diff < 1-epsilon
-
-                d = abs(diff - 0.5) 
-                if d < bag_closest
-                    bag_closest = d
-                    most_fractional_bag = q  
-                end
-            end
-            # println("λq: $(lambda_bar[q]), diff: $(diff), most_fractional_bag: $(most_fractional_bag)")
         end
     end
 
-    return most_fractional_bag, most_fractional_item
+    # # fractional bag weights
+    # fractional_bags_weights = Float64[sum(S[q].*w) for q in fractional_bags]
+
+    # # just read the code...
+    # frac_bags_frac_weights = fractional_bags_weights.*Float64[lambda_bar[q] for q in fractional_bags]
+
+    # # amount of *items* in each bag
+    # bag_item_amount = Float32[sum(S[q]) for q in fractional_bags]
+
+    # # conflicts of each bag
+    # bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
+
+    # # amount of *edges* in each bag
+    # bag_edges_amount = Int64[0 for i in fractional_bags]
+    # for (bag_i, q) in enumerate(fractional_bags)
+    #     for (j, val) in enumerate(q)
+    #         if val > epsilon
+    #             bag_edges_amount[bag_i] += length(conflicts[j])
+    #             # for item_k in conflicts[j]
+    #             #     bag_conflicts[bag_i][item_k] = 1
+    #             # end
+    #         end
+    #     end
+    # end
+
+    # # amount of *conflicts* in each bag
+    # bag_conflicts_amount = Int64[sum(i) for i in bag_conflicts]
+
+    return most_fractional_bag
 end
 
 "returns {i | λ_i > 0 ∀ i}"
 function get_bags_in_use(lambda_bar, S, S_len, J; epsilon=1e-4)
     # bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
     bags_in_use = Int64[]
+    # lambdas_in_use = Float32[]
 
     # get bags selected for use
     for q in 1:S_len
         if lambda_bar[q] > epsilon 
             push!(bags_in_use, q)
+            # push!(lambdas_in_use, q)
         end
     end
     
+    # return bags_in_use, lambdas_in_use
     return bags_in_use
 end
 
@@ -205,7 +270,7 @@ function prune_excess_with_priority(solution, J, w; epsilon=1e-4)
     end
 
     # remove item from bags, prioritizing the most heavy bags
-    bags_weights = Int64[sum([w[j] for j in bag]) for bag in solution]
+    bags_weights = Int64[sum([w[j] for (j, value) in enumerate(bag) if value > .5]) for bag in solution]
     for j in excess
 
         # sort relevant bags by most empty first
@@ -252,12 +317,17 @@ end
 "translates a solution, unmerging items and adding mandatory bags"
 function translate_solution(node; epsilon=1e-4)
 
+    # println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
+
     translated_solution = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.bounds[2]] 
 
+    # items at address i, for each i
     address_items = Vector{Int64}[Int64[0 for j in node.item_address] for i in node.J]
 
-    for (j, address) in enumerate(node.item_address) 
-        address_items[address][j] = 1
+    for (j, address) in enumerate(node.item_address)
+        if address != 0
+            address_items[address][j] = 1
+        end 
     end
 
 
@@ -270,15 +340,28 @@ function translate_solution(node; epsilon=1e-4)
         end
     end
 
+    # convert mandatory_bags to constant length, binary arrays
+    mandatory_bags_binary = Vector{Int64}[Int64[0 for j in node.item_address] for i in 1:node.mandatory_bag_amount]
+    for (i, bag_items) in enumerate(node.mandatory_bags)
+        for j in bag_items
+            mandatory_bags_binary[i][j] = 1     
+        end
+    end
+
     # add the mandatory_bags
-    translated_solution = vcat(translated_solution, node.mandatory_bags)
+    # translated_solution = vcat(translated_solution, mandatory_bags_binary)
+    for (i, j) in enumerate(node.bounds[2]-node.mandatory_bag_amount+1:node.bounds[2])
+        translated_solution[j] = mandatory_bags_binary[i]
+    end
+
+    # println(LOG_IO, "translated_solution: $(translated_solution)")
 
     return translated_solution
 end
 
 "transforms solution structure from binary, same length arrays to integer, variable length arrays"
 function get_pretty_solution(bags, bags_amount; epsilon=1e-4)
-    return Vector{Int64}[ Int64[j for j in 1:length(J) if bags[i][j] > 0] for i in 1:bags_amount ]
+    return Vector{Int64}[ Int64[j for j in 1:length(bags[i]) if bags[i][j] > 0] for i in 1:bags_amount ]
 end
 
 get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]
@@ -287,7 +370,7 @@ reduced_cost(x, pi_bar, J) = 1 - sum([pi_bar[j]*x[j] for j ∈ J])
 "Utility function for retrieving master data necessary for the pricing step"
 function get_master_data_for_pricing(master, J; verbose=2)
     m_obj = objective_value(master)
-    verbose >= 2 && println("Z = $(m_obj)")
+    verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
 
     demand_constraints = get_demand_constraints(master, J)
     pi_bar = dual.(demand_constraints)

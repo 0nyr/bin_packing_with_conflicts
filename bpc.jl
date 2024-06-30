@@ -3,9 +3,12 @@ using Gurobi
 using LinearAlgebra
 
 include("utils.jl")
+# include("pricing.jl")
+include("parallel_pricing.jl")
 
 const GUROBI_ENV = Gurobi.Env()
-    
+
+global LOG_IO = stdout
 
 # struct representing a node in the BB tree
 mutable struct Node
@@ -36,17 +39,24 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     # first, make sure i is the lesser value
     i, j = sort([i,j])
 
-    old_address = item_address[j]
+    # println(LOG_IO, "merging $(i) and $(j)")
+    # println(LOG_IO, "item_address: $(item_address)")
 
+    # j is the old address
+    old_address = j
+
+    # now we move everyone previously at j to i
+    for item_i in unmerge_bag_items([j], item_address)
+        item_address[item_i] = i
+    end
+    
+    # from the perspective of the current node, there will be one less item
     new_J = J[1:end-1]
     new_w = Int64[0 for j in new_J]
 
-    # update address of j
-    item_address[j] = item_address[i]
-
-    println("merging $(i) and $(j)")
-    println("original_w: $(original_w)")
-    println("new_w: $(new_w)")
+    # println(LOG_IO, "original_w: $(original_w)")
+    # println(LOG_IO, "new_w: $(new_w)")
+    # println(LOG_IO, "old_address: $(old_address)")
     
     if i == j
         error()
@@ -55,7 +65,7 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
     # "for j in original J"
     for k in eachindex(item_address)
 
-        if item_address[k] < 1 # skip items in mandatory bags
+        if item_address[k] == 0 # skip items in mandatory bags
             continue
         end
 
@@ -65,9 +75,9 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
         end
 
         # add weight to address
-        println("k: $(k), $(original_w[k]) at $(item_address[k])")
+        # println(LOG_IO, "k: $(k), $(original_w[k]) at $(item_address[k])")
         new_w[item_address[k]] += original_w[k]
-        println("$(new_w)\n$(item_address)")
+        # println(LOG_IO, "$(new_w)\n$(item_address)")
     end
 
     return new_J, new_w
@@ -80,73 +90,59 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     W = node.W
 
     # variable length representation
+    # println(LOG_IO, "q: $(q)")
     items_in_q = Int64[i for (i, val) in enumerate(q) if val > 1e-4] 
-    println("j: $(j), items_in_q: $(items_in_q)")
+    # println(LOG_IO, "j: $(j), items_in_q: $(items_in_q)")
 
     # get items that can be merged with j
-    available_to_merge = Int64[i for i in items_in_q if i != j && w[i] + w[j] < W]
-    println("available_to_merge: $(available_to_merge)")
-    
-    
-    # is there an item such that merging with j is feasible? (w_i + w_j < W) 
-    if !(isempty(available_to_merge))
-        
-        # get largest item in bag, except the fractional item
-        _, i_index = findmax(x -> w[x], available_to_merge)
-        i = available_to_merge[i_index]
+    available_to_merge = Int64[i for i in items_in_q if i != j]
+    # println(LOG_IO, "available_to_merge: $(available_to_merge)")
+            
+    # get largest item in bag, except the fractional item
+    _, i_index = findmax(x -> w[x], available_to_merge)
+    i = available_to_merge[i_index]
 
-        # make child
-        # pos_child = deepcopy(node)
-        node_counter[1] += 1
-        pos_child = Node(
-            node_counter[1], # id
-            1*node.priority,
-            deepcopy(node.J),
-            deepcopy(node.E),
-            deepcopy(node.w),
-            deepcopy(node.W),
-            Vector{Float32}[], # S
-            deepcopy(node.mandatory_bags),
-            deepcopy(node.mandatory_bag_amount),
-            deepcopy(node.forbidden_bags),
-            deepcopy(node.item_address),
-            false, # interval_graph
-            deepcopy(node.bounds), # node bounds
-            Vector{Int64}[], # solution
-            0, # bounds_status
-        )
-        pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+    println(LOG_IO, "rf branching on items $(i) and $(j)")
 
-        # update graph
-        J, E, w, W, S = get_node_parameters(pos_child)
-        pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
-    
-        # Adding positive child to list
-        push!(nodes, pos_child)
-        # println("added node $(pos_child.id) to list")            
-        
-    else # merging is infeasible, only create negative child, with lighest i (higher probability of being in the same bag) 
+    # make child
+    # pos_child = deepcopy(node)
+    # node_counter[1] += 1
+    pos_child = Node(
+        node_counter[1]+1, # id
+        # 1*node.priority,
+        length(node.J)+length(node.E)-1,
+        deepcopy(node.J),
+        deepcopy(node.E),
+        deepcopy(node.w),
+        deepcopy(node.W),
+        Vector{Float32}[], # S
+        deepcopy(node.mandatory_bags),
+        deepcopy(node.mandatory_bag_amount),
+        deepcopy(node.forbidden_bags),
+        deepcopy(node.item_address),
+        false, # interval_graph
+        deepcopy(node.bounds), # node bounds
+        Vector{Int64}[], # solution
+        0, # bounds_status
+    )
+    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
-        # get the lighest i | i != j
-        i_weight = Inf
-        lighest_i = -1
-        println("items_in_q: $(items_in_q)")
-        for i in items_in_q
-            if node.w[i] < i_weight && i != j
-                i_weight = node.w[i]
-                lighest_i = i 
-            end
-        end
-        i = lighest_i
+    # update graph
+    J, E, w, W, S = get_node_parameters(pos_child)
+    pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
 
-    end
+    # Adding positive child to list
+    push!(nodes, pos_child)
+    println(LOG_IO, "added node $(pos_child.id) to list")            
+
 
     # split branch
     # neg_child = deepcopy(node)
-    node_counter[1] += 1
+    # node_counter[1] += 1
     neg_child = Node(
-        node_counter[1], # id
-        1*node.priority,
+        node_counter[1]+2, # id
+        # 1*node.priority,
+        length(node.J)+length(node.E)+1,
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -163,18 +159,26 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
     
-    println("i: $(i), j: $(j), $(node.item_address)")
-    println(node.w)
+    # println(LOG_IO, "i: $(i), j: $(j), $(node.item_address)")
+    # println(LOG_IO, node.w)
 
     # E stores conflicts in terms of the original graph
     i = unmerge_bag_items([i], node.item_address)[1]
     j = unmerge_bag_items([j], node.item_address)[1]
+    
+    # println(LOG_IO, "item_address: $(neg_child.item_address)")
+    # println(LOG_IO, "E before: $(neg_child.E)")
+
+    if sort([i, j]) ∈ neg_child.E
+        error()
+    end
 
     push!(neg_child.E, sort([i,j]))
+    # println(LOG_IO, "E now: $(neg_child.E)")
 
     # Adding negative child to list
     push!(nodes, neg_child)
-    # println("added node $(neg_child.id) to list")
+    println(LOG_IO, "added node $(neg_child.id) to list")
 end
 
 "removes items in q from J, w and E, updating addresses as necessary"
@@ -183,18 +187,18 @@ function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
     items_amount = length(J)
     amount_to_remove = length(q)
 
-    # println("amount_to_remove: $(amount_to_remove)")
-    # println("q: $(q)")
-    # println("q_on_original_G: $(q_on_original_G)")
+    # println(LOG_IO, "amount_to_remove: $(amount_to_remove)")
+    # println(LOG_IO, "q: $(q)")
+    # println(LOG_IO, "q_on_original_G: $(q_on_original_G)")
     
-    # println("item_address: $(item_address)")
-    # println("w: $(w)")
+    # println(LOG_IO, "item_address: $(item_address)")
+    # println(LOG_IO, "w: $(w)")
 
     # 
     new_J = Int64[j for j in 1:items_amount-amount_to_remove]
     new_w = Int64[0 for j in new_J]
 
-    println("q_on_original_G: $(q_on_original_G)")
+    # println(LOG_IO, "q_on_original_G: $(q_on_original_G)")
     # removing
     for i in q_on_original_G
         item_address[i] = 0
@@ -204,16 +208,16 @@ function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
     # from largest to smallest k ∈ q:
     #   move to the left all items which address' > k
     for k in amount_to_remove:-1:1
-        println("removing q[$(k)] = $(q[k])")
+        println(LOG_IO, "removing q[$(k)] = $(q[k])")
         for (j, address) in enumerate(item_address)
             if address > q[k]
                 item_address[j] -= 1 
             end
         end
     end
-    println("here: $(item_address)")
+    # println(LOG_IO, "here: $(item_address)")
 
-    # println("new item_address: $(item_address)")
+    # println(LOG_IO, "new item_address: $(item_address)")
 
     # remove edges containing removed items
     new_E = [e for e in E if !(e[1] ∈ q_on_original_G) && !(e[2] ∈ q_on_original_G)]
@@ -226,7 +230,7 @@ function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
             new_w[address] += original_w[j]
         end
     end
-    # println("new_w: $(new_w)")
+    # println(LOG_IO, "new_w: $(new_w)")
 
 
     return new_J, new_E, new_w
@@ -235,13 +239,14 @@ end
 "makes children with bag branching and adds them to the list"
 function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
-    println("q: $(q)")
+    # println(LOG_IO, "q: $(q)")
     
     q = Int64[i for (i, val) in enumerate(q) if val > .5] # variable length representation
     q_on_original_G = unmerge_bag_items(q, node.item_address) # convert q to original G = (V, E), variable length
     
-    println("q: $(q)")
-    println("q_on_original_G: $(q_on_original_G)")
+    println(LOG_IO, "branching on bag q: $(q_on_original_G)")
+    # println(LOG_IO, "q: $(q)")
+    # println(LOG_IO, "q_on_original_G: $(q_on_original_G)")
 
 
     # who lives at address j?
@@ -257,7 +262,8 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
     # pos_child = deepcopy(node)
     pos_child = Node(
         node_counter[1]+1, # id
-        1*node.priority,
+        # 1*node.priority,
+        length(node.J)-length(q),
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -272,7 +278,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
         Vector{Int64}[], # solution
         0, # bounds_status
     )
-    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
+    pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J)-length(q) + 1 # remove prior upper bound
 
     J, E, w, W, S = get_node_parameters(pos_child)
     
@@ -288,7 +294,8 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
     # neg_child = deepcopy(node)
     neg_child = Node(
         node_counter[1]+2, # id
-        3*node.priority,
+        # 3*node.priority,
+        length(node.J),
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
@@ -310,16 +317,16 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
 
     # Adding positive child to list
     push!(nodes, pos_child)
-    # println("added node $(pos_child.id) to list")
+    println(LOG_IO, "added node $(pos_child.id) to list")
 
     # Adding negative child to list
     push!(nodes, neg_child)
-    # println("added node $(neg_child.id) to list")
+    println(LOG_IO, "added node $(neg_child.id) to list")
     
     # count new nodes
     node_counter[1] += 2
 
-    # println("bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
+    # println(LOG_IO, "bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
 
 "adds new node to queue and node list"
@@ -332,14 +339,14 @@ function register_node(node, nodes, queue)
     # node.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1
     # node.interval_graph = false # will need to check again
 
-    println("adding node to node list")
+    println(LOG_IO, "adding node to node list")
 
     # add new node to list
     push!(nodes, node)
     # node.id = length(nodes)
 
-    println("added node $(node.id) to list")
-    # println(node)
+    println(LOG_IO, "added node $(node.id) to list")
+    # println(LOG_IO, node)
 
     # add to queue at appropriate position
     added = false
@@ -370,7 +377,7 @@ function get_l2_lower_bound(alpha, W, w)
 end
 
 "apply First Fit Decreasing heuristic considering conflicts"
-function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
+function first_fit_decreasing_with_conflicts(J, w, W, E, conflicts; verbose=true)
     bags = Vector{Int64}[Int64[0 for j in J] for i in J]
     # bags = Vector{Bool}[Bool[0 for j in J] for i in J]
     bags_sizes = Int64[0 for i in J]
@@ -379,13 +386,10 @@ function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
 
     J = sort(J, rev=true, by=(x)->w[x])
 
-    # [conflicts of i for each i in J]
-    conflicts = get_edges(J, E)
-
     bags_amount = 1
     # for each item in decreasing order
     for item_i in J
-        verbose && print("bagging item $(item_i), weight of $(w[item_i])")
+        verbose && print(LOG_IO, "bagging item $(item_i), weight of $(w[item_i])")
         
         # try lowest-index bag
         for bag_number in 1:length(J)
@@ -399,7 +403,7 @@ function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
 
             # if item fits and there is no conflict
             if bag_slack - item_weight >= 0 && !(bags_conflicts[bag_number][item_i]) 
-                verbose && println(" at bag $(bag_number)")
+                verbose && println(LOG_IO, " at bag $(bag_number)")
 
                 # add item to bag
                 bag_size += 1
@@ -412,7 +416,7 @@ function first_fit_decreasing_with_conflicts(J, w, W, E; verbose=true)
 
                 # track conflicts
                 for conflict_j in conflicts[item_i]
-                    verbose && println("\tadding conflict with item $(conflict_j)")
+                    verbose && println(LOG_IO, "\tadding conflict with item $(conflict_j)")
                     bags_conflicts[bag_number][conflict_j] = true 
                 end
                 break
@@ -433,7 +437,8 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
     
-    @variable(price, 1 >= x[1:length(J)] >= 0)
+    # @variable(price, 1 >= x[1:length(J)] >= 0)
+    @variable(price, x[1:length(J)], Bin)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
@@ -448,28 +453,34 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
     # set_silent(price)
 
-    # println(pi_bar)
-    verbose >=3 && println(price)
+    # println(LOG_IO, pi_bar)
+    verbose >=3 && println(LOG_IO, price)
+    # if !(print_once[1])
+    #     println(LOG_IO, price)
+    #     print_once[1] = true
+    # end
+    # println(LOG_IO, price)
     optimize!(price)
 
     # is the price feasible?
     if termination_status(price) != OPTIMAL
-        verbose >= 3 && println("price infeasible")
+        verbose >= 3 && println(LOG_IO, "price infeasible")
         return 1, nothing
     end
     
     p_obj = objective_value(price)
-    verbose >=2 && println("̄c = $(p_obj)")
+    verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
         
     return p_obj, value.(price[:x])
 end
 
-"Runs pricing linear programming, but constrains new lambda to be integer"
-function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
+"Runs relaxed pricing linear programming, but constrains the new bin to be integer"
+function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
     @variable(price, 1 >= x[1:length(J)] >= 0)
+    # @variable(price, x[1:length(J)], Bin)
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
@@ -484,44 +495,56 @@ function int_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=
     @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
     # set_silent(price)
 
-    # println(pi_bar)
-    verbose >=3 && println(price)
+    # println(LOG_IO, pi_bar)
+    verbose >=3 && println(LOG_IO, price)
     optimize!(price)
 
     # is the price feasible?
     if termination_status(price) != OPTIMAL
-        verbose >= 3 && println("price infeasible")
+        verbose >= 3 && println(LOG_IO, "price infeasible")
         return 1, nothing
     end
     
     p_obj = objective_value(price)
-    verbose >=2 && println("̄c = $(p_obj)")
+    verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
         
     # remove fractional part from new q
     q = floor_vector(value.(price[:x]), epsilon=epsilon)
     
     # after removing the fractional item, is the new q still useful?
     if !(sum(q) > 2 - epsilon) || q ∈ S 
-        verbose >= 1 && println("integer pricing empty")
+        # verbose >= 1 && println(LOG_IO, "Integer pricing empty")
         return 1, q
     end
 
     return p_obj, q
 end
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
     
     m_obj = Inf
+
+    # global print_once = [false]
+
+    if using_dp
+        len_J = length(J)
+        binarized_E = BitVector[falses(len_J) for i in J]
+
+        for (i, j) in E
+            binarized_E[i][j] = true
+            binarized_E[j][i] = true
+        end
+    end
 
     # run price, add new columns, check solution, repeat if necessary
     iteration = 1
     for iteration in 1:max_iter
 
         optimize!(master)
-        # println("termination optimal: ", termination_status(master) == OPTIMAL)
+        # println(LOG_IO, "termination optimal: ", termination_status(master) == OPTIMAL)
 
         if termination_status(master) != OPTIMAL
-            verbose >= 3 && println("master infeasible")
+            verbose >= 3 && println(LOG_IO, "master infeasible")
             break
         end
 
@@ -530,12 +553,23 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, verbose=verbose)
         
         # run price lp
-        p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
+        if using_dp
+            positive_rcost = Bool[i > 0 for i in pi_bar]
+            p_obj, q = dp_price(J, len_J, pi_bar, positive_rcost, w, binarized_E, W, verbose=verbose, epsilon=epsilon)
+        else
+            p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
+        end
 
         if p_obj < -epsilon
 
             # price
-            verbose >= 3 && println("adding lambda: $(q)")
+            verbose >= 3 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(q)")
+            # if using_dp # checking if dp is correct
+            #     println(LOG_IO, "p_obj: $(p_obj), adding lambda: $([i for (i, j) in enumerate(q) if j > .5])")
+            #     chk_obj, chk_bin = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=0, epsilon=epsilon)
+            #     chk_bin = [i for (i, j) in enumerate(chk_bin) if j > .5]
+            #     println(LOG_IO, "comparing to mip: $(chk_obj) $(chk_bin)")
+            # end
 
             # add new packing scheme to list
             push!(S, q)
@@ -556,7 +590,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             end
 
             # show updated master
-            verbose >= 3 && println(master)
+            verbose >= 3 && println(LOG_IO, master)
 
         else
             break
@@ -564,7 +598,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
     end
 
     if iteration == max_iter && verbose >= 3
-        println("CGA reached max iterations before exiting (check price objective value)")
+        println(LOG_IO, "CGA reached max iterations before exiting (check price objective value)")
     end
 
     if m_obj == Inf
@@ -595,8 +629,8 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
         bounds[2] = node.bounds[2]
         best_node[1] = node
 
-        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
-        println("node $(node.id): $(bounds[2]) -> $(pretty_solution)")
+        # pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        # println(LOG_IO, "node $(node.id): $(bounds[2]) -> $(pretty_solution)")
 
         if bounds[1] == bounds[2] # is the new solution guaranteed to be globally optimal?
             status = 2
@@ -612,10 +646,10 @@ function update_bounds_status(node::Node, bounds, best_node, nodes; verbose=1)
 
     node.bounds_status = status
 
-    if status ∈ [1,2]
-        pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
-        println("node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
-    end
+    # if status ∈ [1,2]
+        # pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+        # println(LOG_IO, "node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+    # end
     # return status
 end
 
@@ -624,9 +658,11 @@ function solve_bpc(
     E::Vector{Vector{Int64}}, 
     w::Vector{Int64}, 
     W::Int64; 
+    time_limit::Int64=600,
     verbose::Int64=1, 
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
+    max_iter::Int64=100,
     )
 
     item_amount = length(J)
@@ -664,8 +700,33 @@ function solve_bpc(
 
     not_first_node = false
 
+    node = nodes[1]
+
+    start_time = time()
+
+    is_optimal = true
+
     # Start the tree
     while !(isempty(nodes))
+
+        if time() - start_time >= time_limit
+            println(LOG_IO, "out of time")
+            is_optimal = false
+            break
+        end
+
+
+        println(LOG_IO, "global bounds: $(bounds)")
+        if not_first_node
+            pretty_solution = get_pretty_solution(translate_solution(node), bounds[2])
+            println(LOG_IO, "node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
+        end
+        println(LOG_IO, "node $(node.id): |J| = $(length(J))")
+        println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
+        println(LOG_IO, "solution: $(node.solution)")
+        println(LOG_IO, "item_address: $(node.item_address)")
+        println(LOG_IO, "\n")
+
 
         # get next node
         _, next_node_position = findmin(x -> x.priority, nodes)
@@ -691,13 +752,15 @@ function solve_bpc(
         end
 
         J, E, w, W, S = get_node_parameters(node)
-        verbose >=1 && println("node $(node.id)")
+        verbose >=1 && println(LOG_IO, "node $(node.id)")
 
-        # println("$(J)\n$(w)")
-        # println("$(node.item_address)")
+
+        # println(LOG_IO, "$(J)\n$(w)")
+        # println(LOG_IO, "$(node.item_address)")
 
         # get translated edges
         translated_E = translate_edges(E, node.item_address)
+        # println(LOG_IO, "translated_E: $(translated_E)")
 
         # get translated mandatory/forbidden bags
         forbidden_bags = Vector{Int64}[merge_bag_items(bag, node.item_address, J) for bag in node.forbidden_bags]
@@ -708,7 +771,7 @@ function solve_bpc(
 
         # get initial lower bound ( ⌈∑w/W⌉ ) 
         node.bounds[1] = get_simple_lower_bound(w, W) + node.mandatory_bag_amount
-        verbose >= 1 && println("⌈∑w/W⌉ lower bound: $(node.bounds[1])")
+        verbose >= 1 && println(LOG_IO, "⌈∑w/W⌉ lower bound: $(node.bounds[1])")
         
         # naive solution (one item per bag)
         naive_solution = get_naive_solution(J)
@@ -721,7 +784,7 @@ function solve_bpc(
             node.bounds[2] = item_amount + node.mandatory_bag_amount
             node.solution = naive_solution
     
-            verbose >= 1 && println("Naive upper bound: $(node.bounds[2])")
+            verbose >= 1 && println(LOG_IO, "Naive upper bound: $(node.bounds[2])")
     
             # update bounds status
             update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
@@ -735,19 +798,22 @@ function solve_bpc(
             end
         end
 
+        # [conflicts of i for each i in J]
+        conflicts = get_edges(J, translated_E)
+
         # FFD heuristic for initial solution and upper bound
         if run_ffd
-            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, translated_E, verbose=verbose>1)
+            ffd_solution, ffd_upper_bound = first_fit_decreasing_with_conflicts(J, w, W, translated_E, conflicts, verbose=verbose>1)
 
             # remove forbidden bags from ffd solution
             ffd_solution_is_good = remove_forbidden_bags(ffd_solution, forbidden_bags)
 
             if ffd_solution_is_good
 
-                verbose >= 1 && println("FFD heuristic upper bound: $(ffd_upper_bound)")
+                verbose >= 1 && println(LOG_IO, "FFD heuristic upper bound: $(ffd_upper_bound + node.mandatory_bag_amount)")
                 
                 # if a better solution than one item per bag was found 
-                if ffd_upper_bound < node.bounds[2]
+                if ffd_upper_bound + node.mandatory_bag_amount < node.bounds[2]
                     node.bounds[2] = ffd_upper_bound + node.mandatory_bag_amount
                     node.solution = ffd_solution
                     
@@ -779,7 +845,7 @@ function solve_bpc(
             if lower_bound + node.mandatory_bag_amount > node.bounds[1]
 
                 node.bounds[1] = lower_bound + node.mandatory_bag_amount
-                verbose >= 1 && println("L2 lower bound with α = $(alpha): $(node.bounds[1])")
+                verbose >= 1 && println(LOG_IO, "L2 lower bound with α = $(alpha): $(node.bounds[1])")
 
                 # update bounds status
                 update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
@@ -803,6 +869,7 @@ function solve_bpc(
         # build master
         # master = Model(Gurobi.Optimizer)
         master = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
+        #  set_time_limit_sec(master, 600)
         set_silent(master)
         
         # add the naive solution as lambda variables (can serve as artificial variables)
@@ -838,17 +905,17 @@ function solve_bpc(
         end
     
         # objective function
-        @objective(master, Min, sum(lambdas) + 10*item_amount*sum(artificial_variables))
+        @objective(master, Min, sum(lambdas) + 1000*item_amount*sum(artificial_variables))
     
         # show initial master
-        verbose >= 2 && println(master)
+        verbose >= 2 && println(LOG_IO, master)
     
             
         # run column generation with specialized pricing
         # if node.interval_graph...
 
-        # run column generation with integer pricing
-        m_obj, cga_ub, S_len = cga(master, int_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        # run column generation with rounded pricing lp (effectively a heuristic)
+        m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
         if termination_status(master) == OPTIMAL
             
             # get solution values
@@ -859,7 +926,7 @@ function solve_bpc(
             current_solution = round_up_solution(x_bar)
             current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
             
-            verbose >= 1 && println("Integer CGA upper bound: $(cga_ub)")
+            verbose >= 1 && println(LOG_IO, "Rounded CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
         
             # was there an improvement from the heuristic?
             if cga_ub + node.mandatory_bag_amount < node.bounds[2]
@@ -888,8 +955,10 @@ function solve_bpc(
         ## BCPA
 
         # apply cga
-        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=1e2)
+        # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
+        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
         if termination_status(master) != OPTIMAL
+            println(LOG_IO, "node $(node.id) linear programming failed to optimize")
             break
         end
 
@@ -900,7 +969,7 @@ function solve_bpc(
 
         if cga_lb + node.mandatory_bag_amount > node.bounds[1]
 
-            verbose >= 1 && println("CGA lower bound: $(cga_lb)")
+            verbose >= 1 && println(LOG_IO, "CGA lower bound: $(cga_lb + node.mandatory_bag_amount)")
 
             node.bounds[1] = cga_lb + node.mandatory_bag_amount
 
@@ -920,36 +989,37 @@ function solve_bpc(
         
         # get branching candidates
         bags_in_use = get_bags_in_use(lambda_bar, S, S_len, J; epsilon=epsilon)
-        most_fractional_bag, most_fractional_item = check_solution_fractionality(bags_in_use, lambda_bar, S, S_len, epsilon=1e-4)
+        # most_fractional_bag = make_branching_analysis(bags_in_use, lambda_bar, S, S_len, conflicts, J, w, epsilon=1e-4)
+        most_fractional_bag, most_fractional_item = find_ryan_foster_branch(bags_in_use, lambda_bar, S, w, epsilon=epsilon)
 
-        # println("lambda_bar: $(lambda_bar)")
-        # println("bags_in_use: $(bags_in_use)")
-        # println("most_fractional_bag: $(most_fractional_bag)")
-        # println("most_fractional_item: $(most_fractional_item)")
+        # println(LOG_IO, "lambda_bar: $(lambda_bar)")
+        # println(LOG_IO, "bags_in_use: $(bags_in_use)")
+        # println(LOG_IO, "most_fractional_bag: $(most_fractional_bag)")
+        # println(LOG_IO, "most_fractional_item: $(most_fractional_item)")
 
         # is there an integer bag to branch on? 
         # That is, 0 < λ_i < 1 | j ∈ {0,1} ∀ j ∈ λ_i
-        if most_fractional_bag != -1
+        # if most_fractional_bag != -1
 
-            println("generating bag branch")
+        #     # get q to branch on
+        #     q = S[most_fractional_bag]
 
-            # get q to branch on
+        #     make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
+
+        # (Ryan and Foster branching)
+        if most_fractional_item[1] != -1
+
             q = S[most_fractional_bag]
+            j = most_fractional_item
 
-            make_child_node_with_bag_branch(node, q, original_w, nodes, node_counter)
-
-
-        # if not, is there an item to branch on? (Ryan and Foster branching)
-        elseif most_fractional_item[1] != -1
-
-            println("generating rf branch")
-
-            q = S[most_fractional_item[1]]
-            j = most_fractional_item[2]
+            println(LOG_IO, "q: $(q)")
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
+            node_counter[1] += 2
 
         else # the solution is integer!
+
+            verbose >= 1 && println(LOG_IO, "node $(node.id) finished with integer solution by CGA")
 
             # get solution values
             lambda_bar = value.(lambdas)
@@ -981,10 +1051,14 @@ function solve_bpc(
         end
     end
 
-    verbose >= 1 && println("tree finished")
+    verbose >= 1 && println(LOG_IO, "tree finished")
     
     solution = translate_solution(best_node[1], epsilon=epsilon)
     final_solution = get_pretty_solution(solution, bounds[2])
 
-    return final_solution, bounds[2]
+    println(LOG_IO, "bounds: $(bounds)")
+    println(LOG_IO, "node.bounds: $(node.bounds)")
+    println(LOG_IO, "node.bounds_status: $(node.bounds_status)")
+
+    return final_solution, bounds[2], is_optimal
 end
