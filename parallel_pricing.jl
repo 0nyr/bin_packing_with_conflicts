@@ -178,7 +178,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
     #         end
     #     end
     # end
-    # println("new_bin: $(new_bin)")
+    # println("new_bin: $(best_label.items)")
     return min_rcost, best_label.items
 end
 

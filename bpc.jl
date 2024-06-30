@@ -722,9 +722,10 @@ function solve_bpc(
             println(LOG_IO, "node $(node.id): $(bounds), $(node.mandatory_bag_amount) -> $(pretty_solution)")
         end
         println(LOG_IO, "node $(node.id): |J| = $(length(J))")
-        println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
-        println(LOG_IO, "solution: $(node.solution)")
-        println(LOG_IO, "item_address: $(node.item_address)")
+        # println(LOG_IO, "mandatory_bags: $(node.mandatory_bags)")
+        # println(LOG_IO, "solution: $(Vector{Int64}[Int64[i for (i, v) in enumerate(bin) if v > 0.5 ] bin for bin in node.solution])")
+        # println(LOG_IO, "solution: $(node.solution)")
+        # println(LOG_IO, "item_address: $(node.item_address)")
         println(LOG_IO, "\n")
 
 
@@ -872,7 +873,7 @@ function solve_bpc(
         #  set_time_limit_sec(master, 600)
         set_silent(master)
         
-        # add the naive solution as lambda variables (can serve as artificial variables)
+        # add the naive solution as lambda variables
         S = Vector{Float32}[q for q in naive_solution]
 
         # if FFD was ran pass the relevant bags to S
@@ -915,6 +916,7 @@ function solve_bpc(
         # if node.interval_graph...
 
         # run column generation with rounded pricing lp (effectively a heuristic)
+        println(LOG_IO, "column generation with rounded pricing lp")
         m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
         if termination_status(master) == OPTIMAL
             
@@ -956,6 +958,7 @@ function solve_bpc(
 
         # apply cga
         # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
+        println(LOG_IO, "column generation with labelling")
         z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
         if termination_status(master) != OPTIMAL
             println(LOG_IO, "node $(node.id) linear programming failed to optimize")
