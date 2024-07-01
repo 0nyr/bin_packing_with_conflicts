@@ -33,11 +33,11 @@ end
 "node parameters getter"
 get_node_parameters(node::Node) = node.J, node.E, node.w, node.W, node.S
 
-"merges two items i and j, merging conflicts, summing their weights"
+"merges two items i and j such that i < j, merging conflicts, summing their weights"
 function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{Int64}, item_address::Vector{Int64})
     
     # first, make sure i is the lesser value
-    i, j = sort([i,j])
+    # i, j = sort([i,j])
 
     # println(LOG_IO, "merging $(i) and $(j)")
     # println(LOG_IO, "item_address: $(item_address)")
@@ -84,7 +84,7 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64}, bags_in_use::Vector{Int64})
     
     w = node.w
     W = node.W
@@ -102,7 +102,24 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     _, i_index = findmax(x -> w[x], available_to_merge)
     i = available_to_merge[i_index]
 
+    # first, make sure i is the lesser value
+    i, j = sort([i,j])
+
     println(LOG_IO, "rf branching on items $(i) and $(j)")
+
+    # pass important bags to child
+    J_len = length(node.J)
+    new_S = Vector{Float64}[Float64[0.0 for _1 in 1:J_len-1] for _2 in bags_in_use]
+    for (new_index, old_index) in enumerate(bags_in_use)
+        
+        # pass the bags without j
+        new_S[new_index] = vcat(node.S[old_index][1:j-1], node.S[old_index][j+1:end])
+
+        # if j was in the old bag, make sure that it is also in the new bag
+        if node.S[old_index][j] > .5
+            node.S[new_index][i] = 1.0
+        end
+    end
 
     # make child
     # pos_child = deepcopy(node)
@@ -115,7 +132,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        Vector{Float64}[], # S
+        deepcopy(new_S), # S
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -132,10 +149,15 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     J, E, w, W, S = get_node_parameters(pos_child)
     pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
 
+    # filter bags that are now too heavy after the merge
+    filter!((x) -> sum([node.w[k] for (k, val) in enumerate(x) if val > .5]) > pos_child.W, pos_child.S)
+
+
     # Adding positive child to list
     push!(nodes, pos_child)
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
+    new_S = Vector{Float64}[S[q] for q in bags_in_use if S[q][i] < .5 || S[q][j] < .5]
 
     # split branch
     # neg_child = deepcopy(node)
@@ -148,7 +170,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        Vector{Float64}[], # S
+        deepcopy(new_S), # S
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -918,12 +940,17 @@ function solve_bpc(
         set_silent(master)
         
         # add the naive solution as lambda variables
-        S = Vector{Float64}[q for q in naive_solution]
+        S = deepcopy(node.S)
+        for q in naive_solution
+            if !(q ∈ S) # pass the relevant bags to S
+                push!(S, q)
+            end
+        end
 
         # if FFD was ran pass the relevant bags to S
         if run_ffd
             for q in ffd_solution
-                if sum(q) > 1 # pass the relevant bags to S
+                if sum(q) > 1.0 && !(q ∈ S) # pass the relevant bags to S
                     push!(S, q)
                 end
             end
@@ -1068,7 +1095,7 @@ function solve_bpc(
 
             println(LOG_IO, "q: $(q)")
 
-            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter)
+            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use)
             node_counter[1] += 2
 
         else # the solution is integer!
