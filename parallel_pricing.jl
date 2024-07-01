@@ -32,6 +32,8 @@ end
 
 function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, epsilon=1e-4)
 
+    # fast_labelling = false
+
     buckets = Vector{Label}[Label[] for i in J]
 
     to_extend = BinaryMinHeap{Label}()
@@ -52,6 +54,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
         end
     end
 
+    # was_extended = false
     trash = Dict{Label, Nothing}()
     # println("starting extensions")
     while !isempty(to_extend)
@@ -68,6 +71,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             continue
         end
 
+        was_extended = false
         Threads.@threads for i in curr_label.last_item_added+1:len_J
 
             # if the item has negative reduced cost, skip it
@@ -146,10 +150,17 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
                     push!(buckets[i], new_label)
                     push!(to_extend, new_label)
                 end
+                was_extended = true
                 # println(new_label)
             end 
         end
+
+        # if !was_extended && fast_labelling && 
+        #     break
+        # end
     end
+
+    # if fast_labelling && !was_extended
 
     min_rcost = Inf
     best_label = nothing

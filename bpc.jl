@@ -27,6 +27,7 @@ mutable struct Node
     bounds::Vector{Int64} # [lower_bound, upper_bound]
     solution::Vector{Vector{Int64}}
     bounds_status::Int64 # 0: not optimal, 1: locally optimized, 2: globally optimized 
+    subset_row_cuts::Vector{Vector{Int64}} # cut_i for i in cuts | cut_i = [k, Si_1, Si_2 ... Si_n] 
 end
 
 
@@ -124,6 +125,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
+        Vector{Int64}[],
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
@@ -156,6 +158,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
+        Vector{Int64}[],
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
     
@@ -277,6 +280,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
+        Vector{Int64}[],
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J)-length(q) + 1 # remove prior upper bound
 
@@ -309,6 +313,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
+        Vector{Int64}[],
     )
     neg_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
@@ -693,6 +698,7 @@ function solve_bpc(
         deepcopy(bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
+        Vector{Int64}[],
     )]
     
     best_node = Node[nodes[1]]
@@ -904,9 +910,20 @@ function solve_bpc(
 
             push!(artificial_variables, au, al)
         end
+
+        # subset_row_cuts (Jepsen, 2008)
+        cut_artificial_variables = VariableRef[]
+        for (n, cut_n) in enumerate(node.subset_row_cuts)
+            av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
+            k = cut_n[1]
+            row_subset = cut_n[2:end]
+
+            @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="subset_r_cut_$(n)")
+            push!(cut_artificial_variables, av_cut)
+        end
     
         # objective function
-        @objective(master, Min, sum(lambdas) + 1000*item_amount*sum(artificial_variables))
+        @objective(master, Min, sum(lambdas) + 1000*item_amount*sum(artificial_variables) + 1000*item_amount*sum(cut_artificial_variables))
     
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
