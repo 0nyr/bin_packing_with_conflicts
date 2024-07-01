@@ -157,7 +157,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     push!(nodes, pos_child)
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
-    new_S = Vector{Float64}[S[q] for q in bags_in_use if S[q][i] < .5 || S[q][j] < .5]
+    new_S = Vector{Float64}[node.S[q] for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
 
     # split branch
     # neg_child = deepcopy(node)
