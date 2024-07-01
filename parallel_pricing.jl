@@ -30,9 +30,32 @@ function Base.isless(l1::Label, l2::Label)
     end
 end
 
-function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, epsilon=1e-4)
+function get_subset_row_cuts_cost(label::Label, subset_row_cuts::Vector{Vector{Int64}}, sigma, sigma_multiplier::Vector{Float64})
+    
+    sigma_multiplier .= 0.0
+
+    for (n, cut_n) in enumerate(subset_row_cuts)
+        
+        # calculate the intersection's size
+        m = 0
+        for c in cut_n[2:end]
+            if label.items[c]
+                m+=1
+            end
+        end
+        sigma_multiplier[n] = m/cut_n[1] # m/k
+    end
+    sigma_multiplier = floor.(sigma_multiplier)
+    return sigma.*sigma_multiplier
+end
+
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64; verbose=3, epsilon=1e-4)
 
     # fast_labelling = false
+
+    # auxiliary data structure
+    # sigma_multiplier = Float64[0.0 for i in subset_row_cuts]
+
 
     buckets = Vector{Label}[Label[] for i in J]
 

@@ -3,7 +3,6 @@ using Gurobi
 using LinearAlgebra
 
 include("utils.jl")
-# include("pricing.jl")
 include("parallel_pricing.jl")
 
 const GUROBI_ENV = Gurobi.Env()
@@ -18,7 +17,7 @@ mutable struct Node
     E::Vector{Vector{Int64}}
     w::Vector{Int64}
     W::Int64
-    S::Vector{Vector{Float32}} # needs to be pruned after a Ryan-Foster merge!
+    S::Vector{Vector{Float64}} # needs to be pruned after a Ryan-Foster merge!
     mandatory_bags::Vector{Vector{Int64}} # mandatory q ∈ S
     mandatory_bag_amount::Int64
     forbidden_bags::Vector{Vector{Int64}} # forbidden q ∈ S
@@ -85,7 +84,7 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     w = node.w
     W = node.W
@@ -116,7 +115,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        Vector{Float32}[], # S
+        Vector{Float64}[], # S
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -149,7 +148,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float32}
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        Vector{Float32}[], # S
+        Vector{Float64}[], # S
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -240,7 +239,7 @@ function remove_from_graph(q, q_on_original_G, J, E, original_w, item_address)
 end
 
 "makes children with bag branching and adds them to the list"
-function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
+function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64})
     
     # println(LOG_IO, "q: $(q)")
     
@@ -271,7 +270,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        Vector{Float32}[], # S
+        Vector{Float64}[], # S
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount) + 1, # add the new mandatory bag
         deepcopy(node.forbidden_bags),
@@ -304,7 +303,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float32}, origina
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        Vector{Float32}[], # S
+        Vector{Float64}[], # S
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -338,7 +337,7 @@ end
 function register_node(node, nodes, queue)
 
     # clear fields that need clearing
-    # node.S = Vector{Float32}[]
+    # node.S = Vector{Float64}[]
     # node.solution = Vector{Int64}[]
     # node.mandatory_bag_amount = length(node.mandatory_bags)
     # node.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1
@@ -525,6 +524,44 @@ function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose
     return p_obj, q
 end
 
+"Searches for subset row cuts"
+function cut_separation(J, lambda_bar, S, n; verbose=3, epsilon=1e-4)
+    # price = Model(Gurobi.Optimizer)
+    cut_separator = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
+    set_silent(cut_separator)
+
+    @variable(cut_separator, x[1:length(J)], Bin)
+    @constraint(cut_separator, sum([x[j] for j ∈ J]) == n, base_name="constraint")
+
+    best_x = Float64[0.0 for j in J]
+    best_obj = -Inf
+    for k in 1:n
+        @objective(price, Max, sum([floor(sum([S[p][j]*x[j] for j ∈ J])/k)*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
+        verbose >=4 && println(LOG_IO, cut_separator)
+        optimize!(cut_separator)
+
+        obj = objective_value(cut_separator)
+        x_bar = value.(price[:x])
+        
+        if obj > 0
+            if obj > best_obj
+                best_x = x_bar
+                best_obj = obj
+            end
+        end
+    end
+
+    # if !(print_once[1])
+    #     println(LOG_IO, price)
+    #     print_once[1] = true
+    # end
+    # println(LOG_IO, price)
+    
+    # verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
+        
+    return best_obj, Int64[i for (i, val) in enumerate(best_x) if val > .5]
+end
+
 function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
     
     m_obj = Inf
@@ -668,6 +705,7 @@ function solve_bpc(
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
     max_iter::Int64=100,
+    dp::Bool=true,
     )
 
     item_amount = length(J)
@@ -689,7 +727,7 @@ function solve_bpc(
         E, 
         w, 
         W, 
-        Vector{Float32}[], # S
+        Vector{Float64}[], # S
         Vector{Int64}[], # mandatory_bags
         0, # mandatory_bag_amount
         Vector{Int64}[], # forbidden_bags
@@ -880,7 +918,7 @@ function solve_bpc(
         set_silent(master)
         
         # add the naive solution as lambda variables
-        S = Vector{Float32}[q for q in naive_solution]
+        S = Vector{Float64}[q for q in naive_solution]
 
         # if FFD was ran pass the relevant bags to S
         if run_ffd
@@ -928,46 +966,42 @@ function solve_bpc(
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
     
-            
-        # run column generation with specialized pricing
-        # if node.interval_graph...
-
         # run column generation with rounded pricing lp (effectively a heuristic)
-        println(LOG_IO, "column generation with rounded pricing lp")
-        m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
-        if termination_status(master) == OPTIMAL
+        # println(LOG_IO, "column generation with rounded pricing lp")
+        # m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
+        # if termination_status(master) == OPTIMAL
             
-            # get solution values
-            lambda_bar = value.(lambdas)
-            x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
+        #     # get solution values
+        #     lambda_bar = value.(lambdas)
+        #     x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
         
-            # treat current solution
-            current_solution = round_up_solution(x_bar)
-            current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
+        #     # treat current solution
+        #     current_solution = round_up_solution(x_bar)
+        #     current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
             
-            verbose >= 1 && println(LOG_IO, "Rounded CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
+        #     verbose >= 1 && println(LOG_IO, "Rounded CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
         
-            # was there an improvement from the heuristic?
-            if cga_ub + node.mandatory_bag_amount < node.bounds[2]
+        #     # was there an improvement from the heuristic?
+        #     if cga_ub + node.mandatory_bag_amount < node.bounds[2]
         
-                node.bounds[2] = cga_ub + node.mandatory_bag_amount
-                best_solution = deepcopy(current_solution)
-                node.solution = best_solution
+        #         node.bounds[2] = cga_ub + node.mandatory_bag_amount
+        #         best_solution = deepcopy(current_solution)
+        #         node.solution = best_solution
                 
-                # update bounds status
-                update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
-                if node.bounds_status != 0 # is it a global or local optimal?
-                    if node.bounds_status == 1 # no need to continue
-                        # prune the tree
-                        continue
-                    else # global optimal
-                        break
-                        # return best_solution, bounds[2]
-                    end
-                end  
-            end
+        #         # update bounds status
+        #         update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
+        #         if node.bounds_status != 0 # is it a global or local optimal?
+        #             if node.bounds_status == 1 # no need to continue
+        #                 # prune the tree
+        #                 continue
+        #             else # global optimal
+        #                 break
+        #                 # return best_solution, bounds[2]
+        #             end
+        #         end  
+        #     end
         
-        end
+        # end
 
 
 
@@ -975,8 +1009,8 @@ function solve_bpc(
 
         # apply cga
         # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
-        println(LOG_IO, "column generation with labelling")
-        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
+        # println(LOG_IO, "column generation with labelling")
+        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
         if termination_status(master) != OPTIMAL
             println(LOG_IO, "node $(node.id) linear programming failed to optimize")
             break

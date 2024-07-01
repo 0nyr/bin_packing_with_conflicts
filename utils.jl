@@ -136,7 +136,7 @@ function find_ryan_foster_branch(bags_in_use, lambda_bar, S, w; epsilon=1e-4)
 end
 
 "Analyze branching possibilities"
-function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float32}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float64=1e-4)
+function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float64}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float64=1e-4)
     
     
     # find most fractional item (by weight) and most fractional bag 
@@ -173,7 +173,7 @@ function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{
     # frac_bags_frac_weights = fractional_bags_weights.*Float64[lambda_bar[q] for q in fractional_bags]
 
     # # amount of *items* in each bag
-    # bag_item_amount = Float32[sum(S[q]) for q in fractional_bags]
+    # bag_item_amount = Float64[sum(S[q]) for q in fractional_bags]
 
     # # conflicts of each bag
     # bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
@@ -199,9 +199,9 @@ end
 
 "returns {i | λ_i > 0 ∀ i}"
 function get_bags_in_use(lambda_bar, S, S_len, J; epsilon=1e-4)
-    # bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
+    # bags = Vector{Float64}[Float64[0.0 for j in J] for i in J]
     bags_in_use = Int64[]
-    # lambdas_in_use = Float32[]
+    # lambdas_in_use = Float64[]
 
     # get bags selected for use
     for q in 1:S_len
@@ -217,7 +217,7 @@ end
 
 "from lambda, returns x"
 function get_x(lambda_bar, S, S_len, J; epsilon=1e-4)
-    bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
+    bags = Vector{Float64}[Float64[0.0 for j in J] for i in J]
 
     # get bags selected for use
     bag_amount = 0

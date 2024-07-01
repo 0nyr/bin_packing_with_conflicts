@@ -14,10 +14,10 @@ verbose=1
 if do_compile_run
     # first run to compile
     println("DOING COMPILE RUN\n\n")
-    # J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
+    J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
     # J, w, E, W = read_file("test/BPWC_2_7_2.txt") 
-    J, w, E, W = read_file("biginterval/BPWC_1_1_3.txt") 
-    solution, z = solve_bpc(J, E, w, W, verbose=verbose, run_ffd=true, max_iter=10000)
+    # J, w, E, W = read_file("biginterval/BPWC_1_1_3.txt") 
+    solution, z = solve_bpc(J, E, w, W, verbose=verbose, run_ffd=true, max_iter=10000, dp=false)
 end
 
 # General log
@@ -53,7 +53,7 @@ for file_path in instances
     
     # solve and get time elapsed
     println(LOG_IO, "J: $(J)\nw: $(w)\nW: $(W)\nE: $(E)")
-    passed_time = @elapsed solution, z, is_optimal = solve_bpc(J, E, w, W, time_limit=600, verbose=verbose, run_ffd=true, max_iter=10000)
+    passed_time = @elapsed solution, z, is_optimal = solve_bpc(J, E, w, W, time_limit=600, verbose=verbose, run_ffd=true, max_iter=10000, dp=false)
     println(LOG_IO, "solution: $(solution)\nz: $(z)")
     
     # register at general log
