@@ -26,7 +26,8 @@ mutable struct Node
     bounds::Vector{Int64} # [lower_bound, upper_bound]
     solution::Vector{Vector{Int64}}
     bounds_status::Int64 # 0: not optimal, 1: locally optimized, 2: globally optimized 
-    subset_row_cuts::Vector{Vector{Int64}} # cut_i for i in cuts | cut_i = [k, Si_1, Si_2 ... Si_n] 
+    subset_row_cuts::Vector{Vector{Int64}} # cut_i for i in cuts | cut_i = [Si_1, Si_2 ... Si_n] 
+    subset_row_k::Vector{Int64} # k_i for i in cuts
 end
 
 
@@ -84,7 +85,7 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64}, bags_in_use::Vector{Int64})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64}, bags_in_use::Vector{Int64}, cuts_binary_data::Vector{BitVector})
     
     w = node.w
     W = node.W
@@ -119,6 +120,21 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         if node.S[old_index][j] > .5
             node.S[new_index][i] = 1.0
         end
+    end
+
+    # translate cuts considering the merge of i and j
+    new_sr_cuts = Vector{Int64}[]
+    new_k = Int64[]
+    for (n, cut_binary) in enumerate(cuts_binary_data)
+        if cut_binary[n][i] && cut_binary[n][j] && length(node.subset_row_cuts)
+
+        end
+
+        new_cut = 
+        
+        k = new_sr_cuts[n_i][1]
+        cut = new_sr_cuts[n_i][2:end]
+    
     end
 
     # make child
@@ -157,6 +173,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     push!(nodes, pos_child)
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
+    # pass important bags to child, while removing bags that violate the new conflict
     new_S = Vector{Float64}[node.S[q] for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
 
     # split branch
@@ -584,11 +601,11 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
     
     # verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
         
-    return best_obj, vcat(Int64[k], Int64[i for (i, val) in enumerate(best_x) if val > .5])
+    return best_obj, k, Int64[i for (i, val) in enumerate(best_x) if val > .5]
 end
 
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, aux_k; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
     
     m_obj = Inf
 
@@ -607,10 +624,6 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
     # get constraints references
     demand_constraints = get_demand_constraints(master, J)
     cut_constraints = get_cut_constraints(master, length(subset_row_cuts))
-
-    # auxiliary data
-    aux_k = Int64[cut[1] for cut in subset_row_cuts] # pre-organized k values
-
 
     # run price, add new columns, check solution, repeat if necessary
     for iteration in 1:max_iter
@@ -635,7 +648,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
-            p_obj, q = dp_price(J, len_J, pi_bar, sigma, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, aux_k, verbose=verbose, epsilon=epsilon)
+            p_obj, q = dp_price(J, len_J, pi_bar, sigma, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, sr_k, verbose=verbose, epsilon=epsilon)
         else
             p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
         end
@@ -671,7 +684,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             # set coefficient of new variable on cut constraints
             for (i, cut) in enumerate(subset_row_cuts)
-                for j in cut[2:end]
+                for j in cut
                     if S[end][j] > 0.5
                         set_normalized_coefficient(cut_constraints[i], lambdas[end], 1)
                     end
@@ -1001,8 +1014,8 @@ function solve_bpc(
         cut_artificial_variables = VariableRef[]
         for (n, cut_n) in enumerate(node.subset_row_cuts)
             av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
-            k = cut_n[1]
-            row_subset = cut_n[2:end]
+            k = node.subset_row_k[n]
+            row_subset = cut_n
 
             @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
             push!(cut_artificial_variables, av_cut)
@@ -1059,11 +1072,14 @@ function solve_bpc(
         # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
         # println(LOG_IO, "column generation with labelling")
         
-        # update cuts auxiliary data for cut processing
+        # cuts auxiliary data for processing
         J_len = length(J)
         cuts_binary_data = BitVector[falses(J_len) for i in node.subset_row_cuts]
-        aux_k = Int64[cut[i] for cut in node.subset_row_cuts]
-
+        for (i, cut) in enumerate(node.subset_row_cuts)
+            for j in cut
+                cuts_binary_data[i][j] = true
+            end
+        end
 
         max_cuts_per_node = 10
         
@@ -1072,7 +1088,7 @@ function solve_bpc(
         cga_lb_break = false
         for i in 1:max_cuts_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, aux_k, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
+            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
@@ -1104,25 +1120,23 @@ function solve_bpc(
             lambda_bar = value.(lambdas)
 
             # try to find subset row cuts
-            violation, cut_data = cut_separation(J, lambda_bar, S)
+            violation, k, cut_data = cut_separation(J, lambda_bar, S)
             if violation > 0
 
                 # add cut data to node
                 push!(node.subset_row_cuts, cut_data)
+                push!(node.subset_row_k, k)
                 n = length(node.subset_row_cuts)
                 
                 # add cut to master
                 av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
-                k = cut_data[1]
-                row_subset = cut_data[2:end]
                 
-                @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="subset_r_cut_$(n)")
+                @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="subset_r_cut_$(n)")
                 push!(cut_artificial_variables, av_cut)
 
                 # update auxiliary cut data
-                push!(aux_k, k)
                 push!(cuts_binary_data, falses(J_len))
-                for r in row_subset
+                for r in cut_data
                     cuts_binary_data[end][r] = true
                 end
                 
