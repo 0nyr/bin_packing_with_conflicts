@@ -590,16 +590,21 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
     cut_separator = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(cut_separator)
 
-    @variable(cut_separator, x[1:length(J)], Bin)
-    x_constraint = @constraint(cut_separator, sum([x[j] for j ∈ J]) == n, base_name="constraint")
-
+    @variable(cut_separator, x[1:length(J)], Bin)    
+    @variable(cut_separator, aux_w[1:length(lambda_bar)] >= 0, Int)
+    
+    main_constraint = @constraint(cut_separator, sum([x[j] for j ∈ J]) == n_min, base_name="main_constraint")
+    for (p, l) in enumerate(lambda_bar)
+        @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
+    end
+    
     best_x = Float64[0.0 for j in J]
     best_obj = -Inf
     k=1
     for n in n_min:n_max
-        set_normalized_rhs(x_constraint, n)
+        set_normalized_rhs(main_constraint, n)
         for k in 1:n
-            @objective(cut_separator, Max, sum([floor(sum([S[p][j]*x[j] for j ∈ J])/k)*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
+            @objective(cut_separator, Max, sum([aux_w[p]*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
             verbose >=4 && println(LOG_IO, cut_separator)
             optimize!(cut_separator)
     
