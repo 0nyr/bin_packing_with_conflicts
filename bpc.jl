@@ -1172,7 +1172,7 @@ function solve_bpc(
                 # add cut to master
                 av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
                 
-                @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="subset_r_cut_$(n)")
+                @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="subset_r_cut_$(n)")
                 push!(cut_artificial_variables, av_cut)
 
                 # update auxiliary cut data
