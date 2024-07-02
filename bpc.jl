@@ -1053,12 +1053,12 @@ function solve_bpc(
         # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
         # println(LOG_IO, "column generation with labelling")
         
-        max_cuts = 10
+        max_cuts_per_node = 10
         
         lambda_bar = Float64[]
         z, cga_lb = Inf, Inf
         cga_lb_break = false
-        for i in 1:max_cuts # cga and cut adding loop
+        for i in 1:max_cuts_per_node # cga and cut adding loop
             
             z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
             if termination_status(master) != OPTIMAL
