@@ -814,6 +814,7 @@ function solve_bpc(
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
+        Int64[],
     )]
     
     best_node = Node[nodes[1]]
