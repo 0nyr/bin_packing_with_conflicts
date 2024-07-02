@@ -8,6 +8,7 @@ struct Label
     items::BitVector # items in the bin so far
     conflicts::BitVector # conflics that will be found by moving forward
     m::Vector{Int64} # amount of custumers involved in cut i for i in cuts: |S_i ∩ V(L)|
+    sigma_ref::Vector{Float64} # necessary for dominance criteria...
 end
 
 # auxiliary stuff
@@ -21,11 +22,35 @@ function Base.isless(l1::Label, l2::Label)
     #   l1 has smaller reduced cost
     #   
 
-    # global l1_tau = [l1.m .% sr_k]
-    # global l2_tau = [l2.m .% sr_k]
+
+    sum_sigma_q_in_Q = 0
+    if length(l1.m) != 0
+        
+        # get sigmas smaller than zero
+        negative_sigma = l1.sigma_ref .< 0
+    
+        if any(negative_sigma)
+    
+            # # get tau
+            # l1_tau = Int64[l1.m .% sr_k]
+            # l2_tau = Int64[l2.m .% sr_k]
+        
+            # l1_tau_is_larger = l1_tau .> l2_tau
+            
+            for (q, is_negative) in enumerate(negative_sigma)
+                if is_negative
+                    if l1.m[q] .% sr_k[q] > l2.m[q] .% sr_k[q] 
+                        sum_sigma_q_in_Q += l1.sigma_ref[q]     
+                    end
+                end
+            end
+
+
+        end
+    end
 
     if l1.weight <= l2.weight
-        if l1.rcost <= l2.rcost
+        if l1.fcost - sum_sigma_q_in_Q <= l2.fcost
             return all(l1.conflicts .<= l2.conflicts)
         else
             return false
@@ -67,7 +92,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
         # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-        label = Label(1-rc[i], 0.0, w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts])
+        label = Label(1-rc[i], 0.0, w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma)
         label.items[i] = true
         update_m(label, i, cuts_binary_data)
         update_fcost(label, sigma, sr_k)
@@ -129,6 +154,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
                 deepcopy(curr_label.items), 
                 new_next_conflicts,
                 # curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+                sigma,
             )
 
             new_label.items[i] = true
