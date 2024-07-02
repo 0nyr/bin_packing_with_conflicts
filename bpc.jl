@@ -603,6 +603,10 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         end
     end
 
+    # get constraints references
+    demand_constraints = get_demand_constraints(master, J)
+    cut_constraints = get_cut_constraints(master, length(subset_row_cuts))
+
     # run price, add new columns, check solution, repeat if necessary
     for iteration in 1:max_iter
 
@@ -614,9 +618,13 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             break
         end
 
-
         # get values to build price
-        m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, verbose=verbose)
+        m_obj = objective_value(master)
+        pi_bar = dual.(demand_constraints)
+
+        verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
+        
+        # m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, subset_row_cuts, verbose=verbose)
         
         # run price lp
         if using_dp
@@ -650,8 +658,17 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             # set coefficient of new variable on demand constraints
             for i in J
-                if S[end][i] > 0
+                if S[end][i] > 0.5
                     set_normalized_coefficient(demand_constraints[i], lambdas[end], S[end][i])
+                end
+            end
+
+            # set coefficient of new variable on cut constraints
+            for (i, cut) in enumerate(subset_row_cuts)
+                for j in cut[2:end]
+                    if S[end][j] > 0.5
+                        set_normalized_coefficient(cut_constraints[i], lambdas[end], 1)
+                    end
                 end
             end
 
@@ -981,7 +998,7 @@ function solve_bpc(
             k = cut_n[1]
             row_subset = cut_n[2:end]
 
-            @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="subset_r_cut_$(n)")
+            @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
             push!(cut_artificial_variables, av_cut)
         end
     
@@ -1036,7 +1053,7 @@ function solve_bpc(
         # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
         # println(LOG_IO, "column generation with labelling")
         
-        max_cuts = 100
+        max_cuts = 10
         
         lambda_bar = Float64[]
         z, cga_lb = Inf, Inf

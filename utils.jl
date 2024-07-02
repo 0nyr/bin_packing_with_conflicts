@@ -365,15 +365,21 @@ function get_pretty_solution(bags, bags_amount; epsilon=1e-4)
 end
 
 get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]
+get_cut_constraints(model, cuts_amount::Int64) = [constraint_by_name(model, "sr_cut_$(i)") for i in 1:length(subset_row_cuts)]
+
 reduced_cost(x, pi_bar, J) = 1 - sum([pi_bar[j]*x[j] for j ∈ J])
 
-"Utility function for retrieving master data necessary for the pricing step"
-function get_master_data_for_pricing(master, J; verbose=2)
-    m_obj = objective_value(master)
-    verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
 
-    demand_constraints = get_demand_constraints(master, J)
-    pi_bar = dual.(demand_constraints)
+# "Utility function for retrieving master data necessary for the pricing step"
+# function get_master_data_for_pricing(master, J::Vector{Int64}, subset_row_cuts::Vector{Vector{Int64}}; verbose=2)
+#     m_obj = objective_value(master)
+#     verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
 
-    return m_obj, demand_constraints, pi_bar
-end
+#     demand_constraints = get_demand_constraints(master, J)
+#     pi_bar = dual.(demand_constraints)
+
+#     cut_constraints
+
+
+#     return m_obj, demand_constraints, pi_bar
+# end
