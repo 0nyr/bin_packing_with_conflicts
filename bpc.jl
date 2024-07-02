@@ -679,7 +679,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         # get values to build price
         m_obj = objective_value(master)
         pi_bar = dual.(demand_constraints)
-        if isempty(cut_constraints) # trying to get from an empty array will raise error 
+        if isempty(cut_constraints) # trying to get from an empty array will raise error
             sigma_bar = Float64[]
         else
             sigma_bar = dual.(cut_constraints)
@@ -1176,7 +1176,7 @@ function solve_bpc(
                 # add cut to master
                 av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
                 
-                @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="subset_r_cut_$(n)")
+                @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
                 push!(cut_artificial_variables, av_cut)
 
                 # update auxiliary cut data
