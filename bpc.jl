@@ -679,7 +679,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         # get values to build price
         m_obj = objective_value(master)
         pi_bar = dual.(demand_constraints)
-        if isempty(cut_constraints)
+        if isempty(cut_constraints) # trying to get from an empty array will raise error 
             sigma_bar = Float64[]
         else
             sigma_bar = dual.(cut_constraints)
