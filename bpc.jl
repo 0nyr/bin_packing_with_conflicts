@@ -594,8 +594,11 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
     @variable(cut_separator, aux_w[1:length(lambda_bar)] >= 0, Int)
     
     main_constraint = @constraint(cut_separator, sum([x[j] for j ∈ J]) == n_min, base_name="main_constraint")
+
+    aux_constraints = ConstraintRef[]
     for (p, l) in enumerate(lambda_bar)
-        @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
+        new_const = @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
+        push!(aux_constraints, new_const)
     end
     
     best_x = Float64[0.0 for j in J]
@@ -604,6 +607,13 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
     for n in n_min:n_max
         set_normalized_rhs(main_constraint, n)
         for k in 1:n
+            for (p, l) in enumerate(lambda_bar)
+                for j in J
+                    set_normalized_coefficient(aux_constraints[p], x[j], S[p][j]/k)
+                end
+            end
+
+
             @objective(cut_separator, Max, sum([aux_w[p]*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
             verbose >=4 && println(LOG_IO, cut_separator)
             optimize!(cut_separator)
