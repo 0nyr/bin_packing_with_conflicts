@@ -1126,7 +1126,7 @@ function solve_bpc(
             end
         end
 
-        max_cuts = len_J/2
+        max_cuts = length(J)/2
         max_cuts_per_node = 10
         cuts_added_this_node = 0
         
