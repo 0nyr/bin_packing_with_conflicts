@@ -597,7 +597,8 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
 
     aux_constraints = ConstraintRef[]
     for (p, l) in enumerate(lambda_bar)
-        new_const = @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
+        # new_const = @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
+        new_const = @constraint(cut_separator, sum([x[j] for j ∈ J]) + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
         push!(aux_constraints, new_const)
     end
     
