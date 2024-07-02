@@ -214,7 +214,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
-        Vector{Int64}[],
         deepcopy(node.subset_row_cuts),
         deepcopy(node.subset_row_k),
     )
