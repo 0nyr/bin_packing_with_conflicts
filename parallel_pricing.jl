@@ -2,6 +2,7 @@ using DataStructures
 
 struct Label
     rcost::Float64 # less is better
+    fcost::Float64 # reduced cost considering cut violations (less is better)
     weight::Int64 # current weight
     last_item_added::Int # item added in this label
     items::BitVector # items in the bin so far
@@ -12,15 +13,16 @@ end
 # auxiliary stuff
 SPINLOCK = Threads.SpinLock()
 
-
-
-
 "Returns true if l1 dominates l2"
 function Base.isless(l1::Label, l2::Label)
 
     # l1 dominates l2 if:
     #   the possibilities set of l1 *at least contains* the possibilities set of l2
     #   l1 has smaller reduced cost
+    #   
+
+    # global l1_tau = [l1.m .% aux_k]
+    # global l2_tau = [l2.m .% aux_k]
 
     if l1.weight <= l2.weight
         if l1.rcost <= l2.rcost
@@ -33,25 +35,6 @@ function Base.isless(l1::Label, l2::Label)
     end
 end
 
-function get_subset_row_cuts_cost(label::Label, subset_row_cuts::Vector{Vector{Int64}}, sigma, sigma_multiplier::Vector{Float64})
-    
-    sigma_multiplier .= 0.0
-
-    for (n, cut_n) in enumerate(subset_row_cuts)
-        
-        # calculate the intersection's size
-        m = 0
-        for c in cut_n[2:end]
-            if label.items[c]
-                m+=1
-            end
-        end
-        sigma_multiplier[n] = m/cut_n[1] # m/k
-    end
-    sigma_multiplier = floor.(sigma_multiplier)
-    return sigma.*sigma_multiplier
-end
-
 "Updates the amount of customers involved in each cut after the label visits customer i"
 function update_m(label, i, cuts_binary_data)
     for (k, cut_k) in enumerate(cuts_binary_data)
@@ -61,13 +44,18 @@ function update_m(label, i, cuts_binary_data)
     end
 end
 
-function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}; verbose=3, epsilon=1e-4)
+"Updates the label final cost (the reduced cost considering cut violations)"
+function update_fcost(label::Label, sigma::Vector{Float64}, aux_k::Int64)
+    label.fcost = label.rcost - sigma.*floor.(label.m ./ aux_k)
+end
+
+"Dynamic programming (labelling) price"
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}, aux_k::Vector{Int64}; verbose=3, epsilon=1e-4)
 
     # fast_labelling = false
 
     # auxiliary data structure
-    sigma_multiplier = Float64[0.0 for i in subset_row_cuts]
-
+    # sigma_multiplier = Float64[0.0 for i in subset_row_cuts]
 
     buckets = Vector{Label}[Label[] for i in J]
 
@@ -79,10 +67,10 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
         # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-        label = Label(1-rc[i], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts])
+        label = Label(1-rc[i], 0.0, w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts])
         label.items[i] = true
         update_m(label, i, cuts_binary_data)
-
+        update_fcost(label, sigma, aux_k)
 
         push!(buckets[i], label)
 
@@ -134,6 +122,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_
 
             new_label = Label(
                 curr_label.rcost - rc[i], 
+
                 new_weight, 
                 i, 
                 # Label[curr_label], 
