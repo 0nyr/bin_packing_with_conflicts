@@ -1236,7 +1236,7 @@ function solve_bpc(
 
             println(LOG_IO, "q: $(q)")
 
-            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use)
+            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data)
             node_counter[1] += 2
 
         else # the solution is integer!
