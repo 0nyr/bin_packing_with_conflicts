@@ -1126,12 +1126,16 @@ function solve_bpc(
             end
         end
 
+        max_cuts = len_J/2
         max_cuts_per_node = 10
+        cuts_added_this_node = 0
         
         lambda_bar = Float64[]
         z, cga_lb = Inf, Inf
         cga_lb_break = false
-        for i in 1:max_cuts_per_node # cga and cut adding loop
+        continue_adding_cuts = true
+        while continue_adding_cuts # cga and cut adding loop
+        # for i in 1:max_cuts_per_node # cga and cut adding loop
             
             z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
             if termination_status(master) != OPTIMAL
@@ -1161,6 +1165,12 @@ function solve_bpc(
                 end  
             end
 
+            # if too many cuts already, skip the stop the cut adding loop
+            if cuts_added_this_node >= max_cuts_per_node || length(node.subset_row_cuts) >= max_cuts
+                continue_adding_cuts = false
+                break
+            end
+
             # get lambda values of the solution
             lambda_bar = value.(lambdas)
 
@@ -1184,6 +1194,8 @@ function solve_bpc(
                 for r in cut_data
                     cuts_binary_data[end][r] = true
                 end
+
+                cuts_added_this_node += 1
                 
             else
                 break
