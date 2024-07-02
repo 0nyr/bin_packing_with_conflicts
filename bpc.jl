@@ -547,7 +547,7 @@ function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose
 end
 
 "Searches for subset row cuts"
-function cut_separation(J, lambda_bar, S, n; verbose=3, epsilon=1e-4)
+function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_max=5)
     # price = Model(Gurobi.Optimizer)
     cut_separator = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(cut_separator)
@@ -557,18 +557,21 @@ function cut_separation(J, lambda_bar, S, n; verbose=3, epsilon=1e-4)
 
     best_x = Float64[0.0 for j in J]
     best_obj = -Inf
-    for k in 1:n
-        @objective(price, Max, sum([floor(sum([S[p][j]*x[j] for j ∈ J])/k)*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
-        verbose >=4 && println(LOG_IO, cut_separator)
-        optimize!(cut_separator)
-
-        obj = objective_value(cut_separator)
-        x_bar = value.(price[:x])
-        
-        if obj > 0
-            if obj > best_obj
-                best_x = x_bar
-                best_obj = obj
+    k=1
+    for n in n_min:n_max
+        for k in 1:n
+            @objective(price, Max, sum([floor(sum([S[p][j]*x[j] for j ∈ J])/k)*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
+            verbose >=4 && println(LOG_IO, cut_separator)
+            optimize!(cut_separator)
+    
+            obj = objective_value(cut_separator)
+            x_bar = value.(price[:x])
+            
+            if obj > 0
+                if obj > best_obj
+                    best_x = x_bar
+                    best_obj = obj
+                end
             end
         end
     end
@@ -581,10 +584,10 @@ function cut_separation(J, lambda_bar, S, n; verbose=3, epsilon=1e-4)
     
     # verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
         
-    return best_obj, Int64[i for (i, val) in enumerate(best_x) if val > .5]
+    return best_obj, vcat(Int64[k], Int64[i for (i, val) in enumerate(best_x) if val > .5])
 end
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
     
     m_obj = Inf
 
@@ -601,7 +604,6 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
     end
 
     # run price, add new columns, check solution, repeat if necessary
-    iteration = 1
     for iteration in 1:max_iter
 
         optimize!(master)
@@ -619,7 +621,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
-            p_obj, q = dp_price(J, len_J, pi_bar, positive_rcost, w, binarized_E, W, verbose=verbose, epsilon=epsilon)
+            p_obj, q = dp_price(J, len_J, pi_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, verbose=verbose, epsilon=epsilon)
         else
             p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
         end
@@ -659,10 +661,6 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         else
             break
         end
-    end
-
-    if iteration == max_iter && verbose >= 3
-        println(LOG_IO, "CGA reached max iterations before exiting (check price objective value)")
     end
 
     if m_obj == Inf
@@ -1037,33 +1035,69 @@ function solve_bpc(
         # apply cga
         # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
         # println(LOG_IO, "column generation with labelling")
-        z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
-        if termination_status(master) != OPTIMAL
-            println(LOG_IO, "node $(node.id) linear programming failed to optimize")
-            break
+        
+        max_cuts = 100
+        
+        lambda_bar = Float64[]
+        z, cga_lb = Inf, Inf
+        cga_lb_break = false
+        for i in 1:max_cuts # cga and cut adding loop
+            
+            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
+            if termination_status(master) != OPTIMAL
+                println(LOG_IO, "node $(node.id) linear programming failed to optimize")
+                break
+            end
+    
+            # # is there already a better or equal solution?
+            # if cga_lb + node.mandatory_bag_amount >= bounds[2]
+            #     continue # close node
+            # end
+    
+            if cga_lb + node.mandatory_bag_amount > node.bounds[1]
+    
+                verbose >= 1 && println(LOG_IO, "CGA lower bound: $(cga_lb + node.mandatory_bag_amount)")
+    
+                node.bounds[1] = cga_lb + node.mandatory_bag_amount
+    
+                # update bounds status
+                update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
+                if node.bounds_status != 0 # is it a global or local optimal?
+                    if node.bounds_status == 1 # no need to continue
+                        # prune the tree
+                        cga_lb_break = true
+                        break
+                    end
+                end  
+            end
+
+            # get lambda values of the solution
+            lambda_bar = value.(lambdas)
+
+            # try to find subset row cuts
+            violation, cut_data = cut_separation(J, lambda_bar, S)
+            if violation > 0
+
+                # add cut data to node
+                push!(node.subset_row_cuts, cut_data)
+                n = length(node.subset_row_cuts)
+                
+                # add cut to master
+                av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
+                k = cut_data[1]
+                row_subset = cut_data[2:end]
+    
+                @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="subset_r_cut_$(n)")
+                push!(cut_artificial_variables, av_cut)
+
+            else
+                break
+            end
         end
 
-        # # is there already a better or equal solution?
-        # if cga_lb + node.mandatory_bag_amount >= bounds[2]
-        #     continue # close node
-        # end
-
-        if cga_lb + node.mandatory_bag_amount > node.bounds[1]
-
-            verbose >= 1 && println(LOG_IO, "CGA lower bound: $(cga_lb + node.mandatory_bag_amount)")
-
-            node.bounds[1] = cga_lb + node.mandatory_bag_amount
-
-            # update bounds status
-            update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
-            if node.bounds_status != 0 # is it a global or local optimal?
-                if node.bounds_status == 1 # no need to continue
-                    # prune the tree
-                    continue
-                end
-            end  
+        if cga_lb_break
+            continue # prune the tree
         end
-
 
         # get lambda values of the solution
         lambda_bar = value.(lambdas)

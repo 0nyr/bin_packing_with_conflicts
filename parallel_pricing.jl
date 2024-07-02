@@ -49,12 +49,12 @@ function get_subset_row_cuts_cost(label::Label, subset_row_cuts::Vector{Vector{I
     return sigma.*sigma_multiplier
 end
 
-function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64; verbose=3, epsilon=1e-4)
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}; verbose=3, epsilon=1e-4)
 
     # fast_labelling = false
 
     # auxiliary data structure
-    # sigma_multiplier = Float64[0.0 for i in subset_row_cuts]
+    sigma_multiplier = Float64[0.0 for i in subset_row_cuts]
 
 
     buckets = Vector{Label}[Label[] for i in J]
