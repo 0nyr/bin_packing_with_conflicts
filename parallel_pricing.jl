@@ -4,13 +4,16 @@ struct Label
     rcost::Float64 # less is better
     weight::Int64 # current weight
     last_item_added::Int # item added in this label
-    # prev_lab::Vector{Label} # last label
     items::BitVector # items in the bin so far
     conflicts::BitVector # conflics that will be found by moving forward
-
+    m::Vector{Int64} # amount of custumers involved in cut i for i in cuts: |S_i ∩ V(L)|
 end
 
+# auxiliary stuff
 SPINLOCK = Threads.SpinLock()
+
+
+
 
 "Returns true if l1 dominates l2"
 function Base.isless(l1::Label, l2::Label)
@@ -49,7 +52,16 @@ function get_subset_row_cuts_cost(label::Label, subset_row_cuts::Vector{Vector{I
     return sigma.*sigma_multiplier
 end
 
-function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}; verbose=3, epsilon=1e-4)
+"Updates the amount of customers involved in each cut after the label visits customer i"
+function update_m(label, i, cuts_binary_data)
+    for (k, cut_k) in enumerate(cuts_binary_data)
+        if cut_k[i]
+            label.m += 1
+        end
+    end
+end
+
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}; verbose=3, epsilon=1e-4)
 
     # fast_labelling = false
 
@@ -67,8 +79,10 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, positive_
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
         # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-        label = Label(1-rc[i], w[i], i, falses(len_J), deepcopy(binarized_E[i]))
+        label = Label(1-rc[i], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts])
         label.items[i] = true
+        update_m(label, i, cuts_binary_data)
+
 
         push!(buckets[i], label)
 
