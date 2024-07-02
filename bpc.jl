@@ -126,7 +126,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     new_sr_cuts = Vector{Int64}[]
     new_k = Int64[]
     for (n, cut_binary) in enumerate(cuts_binary_data)
-        if cut_binary[n][i] && cut_binary[n][j]
+        if cut_binary[i] && cut_binary[j]
             if node.subset_row_k[n] > length(node.subset_row_cuts[n]) - 1 
                 continue # the cut is only valid if 1 < k <= |S|
             end
@@ -134,7 +134,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
             # update positions and ignore the "new i" (j's new name)
             new_cut = Int64[r > j ? r-1 : r for r in node.subset_row_cuts[n] if r != j]
     
-        elseif cut_binary[n][j] 
+        elseif cut_binary[j] 
             
             # transform j into i and update positions
             new_cut = sort(Int64[r > j ? r-1 : r == j ? i : r for r in node.subset_row_cuts[n] if r != j])
@@ -1234,7 +1234,7 @@ function solve_bpc(
             q = S[most_fractional_bag]
             j = most_fractional_item
 
-            println(LOG_IO, "q: $(q)")
+            # println(LOG_IO, "q: $(q)")
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data)
             node_counter[1] += 2
