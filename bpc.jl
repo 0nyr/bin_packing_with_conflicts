@@ -126,15 +126,34 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     new_sr_cuts = Vector{Int64}[]
     new_k = Int64[]
     for (n, cut_binary) in enumerate(cuts_binary_data)
-        if cut_binary[n][i] && cut_binary[n][j] && length(node.subset_row_cuts)
+        if cut_binary[n][i] && cut_binary[n][j]
+            if node.subset_row_k[n] > length(node.subset_row_cuts[n]) - 1 
+                continue # the cut is only valid if 1 < k <= |S|
+            end
+
+            # update positions and ignore the "new i" (j's new name)
+            new_cut = Int64[r > j ? r-1 : r for r in node.subset_row_cuts[n] if r != j]
+    
+        elseif cut_binary[n][j] 
+            
+            # transform j into i and update positions
+            new_cut = sort(Int64[r > j ? r-1 : r == j ? i : r for r in node.subset_row_cuts[n] if r != j])
+        
+        else
+
+            # update positions
+            new_cut = Int64[r > j ? r-1 : r for r in node.subset_row_cuts[n]]
 
         end
 
-        new_cut = 
-        
-        k = new_sr_cuts[n_i][1]
-        cut = new_sr_cuts[n_i][2:end]
-    
+        if new_cut ∈ new_sr_cuts # does the cut already exists? Possible after merging
+            continue
+        else # add translated cut
+            push!(new_sr_cuts, new_cut)
+            push!(new_k, node.subset_row_k[n])
+        end
+
+
     end
 
     # make child
@@ -158,6 +177,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
+        Int64[],
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
@@ -197,6 +217,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
+        Int64[],
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
     
@@ -319,6 +340,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
+        Int64[],
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J)-length(q) + 1 # remove prior upper bound
 
@@ -352,6 +374,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
+        Int64[],
     )
     neg_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
