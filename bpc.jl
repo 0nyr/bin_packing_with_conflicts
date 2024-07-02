@@ -152,8 +152,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
             push!(new_sr_cuts, new_cut)
             push!(new_k, node.subset_row_k[n])
         end
-
-
     end
 
     # make child
@@ -176,8 +174,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
-        Vector{Int64}[],
-        Int64[],
+        new_sr_cuts,
+        new_k,
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
@@ -217,7 +215,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
-        Int64[],
+        deepcopy(node.subset_row_cuts),
+        deepcopy(node.subset_row_k),
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
     
