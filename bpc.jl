@@ -1126,7 +1126,7 @@ function solve_bpc(
             end
         end
 
-        max_cuts_per_node = 100
+        max_cuts_per_node = 10
         
         lambda_bar = Float64[]
         z, cga_lb = Inf, Inf
