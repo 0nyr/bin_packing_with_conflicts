@@ -22,42 +22,39 @@ function Base.isless(l1::Label, l2::Label)
     #   l1 has smaller reduced cost
     #   
 
+    if l1.weight <= l2.weight
+        if all(l1.conflicts .<= l2.conflicts)
 
-    sum_sigma_q_in_Q = 0
-    if length(l1.m) != 0
-        
-        # get sigmas smaller than zero
-        negative_sigma = l1.sigma_ref .< 0
-    
-        if any(negative_sigma)
-    
-            # # get tau
-            # l1_tau = Int64[l1.m .% sr_k]
-            # l2_tau = Int64[l2.m .% sr_k]
-        
-            # l1_tau_is_larger = l1_tau .> l2_tau
+            sum_sigma_q_in_Q = 0
+            if length(l1.m) != 0
+                
+                # get sigmas smaller than zero
+                negative_sigma = l1.sigma_ref .< 0
             
-            for (q, is_negative) in enumerate(negative_sigma)
-                if is_negative
-                    if l1.m[q] .% sr_k[q] > l2.m[q] .% sr_k[q] 
-                        sum_sigma_q_in_Q += l1.sigma_ref[q]     
+                if any(negative_sigma)
+            
+                    # # get tau
+                    # l1_tau = Int64[l1.m .% sr_k]
+                    # l2_tau = Int64[l2.m .% sr_k]
+                    # l1_tau_is_larger = l1_tau .> l2_tau
+                    
+                    for (q, is_negative) in enumerate(negative_sigma) # start by checking sigma, most likely positive 
+                        if is_negative
+                            if l1.m[q] .% sr_k[q] > l2.m[q] .% sr_k[q] 
+                                sum_sigma_q_in_Q += l1.sigma_ref[q]     
+                            end
+                        end
                     end
                 end
             end
-
-
-        end
-    end
-
-    if l1.weight <= l2.weight
-        if l1.fcost - sum_sigma_q_in_Q <= l2.fcost
-            return all(l1.conflicts .<= l2.conflicts)
+            return l1.fcost - sum_sigma_q_in_Q <= l2.fcost
         else
             return false
         end
     else
         return false
     end
+
 end
 
 "Updates the amount of customers involved in each cut after the label visits customer i"
