@@ -19,8 +19,7 @@ function Base.isless(l1::Label, l2::Label)
 
     # l1 dominates l2 if:
     #   the possibilities set of l1 *at least contains* the possibilities set of l2
-    #   l1 has smaller reduced cost
-    #   
+    #   l1 has smaller reduced cost (considering cut related effects)
 
     if l1.weight <= l2.weight
         if all(l1.conflicts .<= l2.conflicts)
@@ -32,15 +31,11 @@ function Base.isless(l1::Label, l2::Label)
                 negative_sigma = l1.sigma_ref .< 0
             
                 if any(negative_sigma)
-            
-                    # # get tau
-                    # l1_tau = Int64[l1.m .% sr_k]
-                    # l2_tau = Int64[l2.m .% sr_k]
-                    # l1_tau_is_larger = l1_tau .> l2_tau
                     
                     for (q, is_negative) in enumerate(negative_sigma) # start by checking sigma, most likely positive 
                         if is_negative
-                            if l1.m[q] .% sr_k[q] > l2.m[q] .% sr_k[q] 
+                            # tau_l1 > tau_l2 ?
+                            if l1.m[q] % sr_k[q] > l2.m[q] % sr_k[q] 
                                 sum_sigma_q_in_Q += l1.sigma_ref[q]     
                             end
                         end
