@@ -21,8 +21,8 @@ function Base.isless(l1::Label, l2::Label)
     #   l1 has smaller reduced cost
     #   
 
-    # global l1_tau = [l1.m .% aux_k]
-    # global l2_tau = [l2.m .% aux_k]
+    # global l1_tau = [l1.m .% sr_k]
+    # global l2_tau = [l2.m .% sr_k]
 
     if l1.weight <= l2.weight
         if l1.rcost <= l2.rcost
@@ -45,12 +45,12 @@ function update_m(label, i, cuts_binary_data)
 end
 
 "Updates the label final cost (the reduced cost considering cut violations)"
-function update_fcost(label::Label, sigma::Vector{Float64}, aux_k::Int64)
-    label.fcost = label.rcost - sigma.*floor.(label.m ./ aux_k)
+function update_fcost(label::Label, sigma::Vector{Float64}, sr_k::Int64)
+    label.fcost = label.rcost - sigma.*floor.(label.m ./ sr_k)
 end
 
 "Dynamic programming (labelling) price"
-function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}, aux_k::Vector{Int64}; verbose=3, epsilon=1e-4)
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}, sr_k::Vector{Int64}; verbose=3, epsilon=1e-4)
 
     # fast_labelling = false
 
@@ -70,7 +70,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
         label = Label(1-rc[i], 0.0, w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts])
         label.items[i] = true
         update_m(label, i, cuts_binary_data)
-        update_fcost(label, sigma, aux_k)
+        update_fcost(label, sigma, sr_k)
 
         push!(buckets[i], label)
 
@@ -122,7 +122,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
             new_label = Label(
                 curr_label.rcost - rc[i], 
-
+                0,
                 new_weight, 
                 i, 
                 # Label[curr_label], 
@@ -132,8 +132,8 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
             )
 
             new_label.items[i] = true
-
-
+            update_m(label, i, cuts_binary_data)
+            update_fcost(label, sigma, sr_k)
 
             # check for domination
             dominated = Dict{Label, Nothing}()
