@@ -1157,7 +1157,7 @@ function solve_bpc(
         end
 
         max_cuts = length(J)/2
-        max_cuts_per_node = 0
+        max_cuts_per_node = 10
         cuts_added_this_node = 0
         
         lambda_bar = Float64[]
