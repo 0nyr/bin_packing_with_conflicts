@@ -186,7 +186,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
 
     # filter bags that are now too heavy after the merge
-    filter!((x) -> sum([node.w[k] for (k, val) in enumerate(x) if val > .5]) > pos_child.W, pos_child.S)
+    filter!((x) -> sum([node.w[k] for (k, val) in enumerate(x) if val > .5]) < pos_child.W, pos_child.S)
 
 
     # Adding positive child to list
@@ -342,6 +342,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         0, # bounds_status
         Vector{Int64}[],
         Int64[],
+        vcat(node.branch_history, Vector{Int64}[[0, i, j]]),
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J)-length(q) + 1 # remove prior upper bound
 
@@ -376,6 +377,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         0, # bounds_status
         Vector{Int64}[],
         Int64[],
+        vcat(node.branch_history, Vector{Int64}[[0, i, j]]),
     )
     neg_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
@@ -709,6 +711,16 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             #     chk_obj, chk_bin = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=0, epsilon=epsilon)
             #     chk_bin = [i for (i, j) in enumerate(chk_bin) if j > .5]
             #     println(LOG_IO, "comparing to mip: $(chk_obj) $(chk_bin)")
+            # end
+
+            # pretty_q = Int64[n for (n, v) in enumerate(q) if v > .5]
+            # if pretty_q == Int64[1, 5, 27, 29, 43]
+            #     print_node_status(node)
+
+            #     println("master: \n")
+            #     println(master)
+
+            #     error("here!")
             # end
 
             # add new packing scheme to list
@@ -1310,3 +1322,4 @@ function solve_bpc(
 
     return final_solution, bounds[2], is_optimal
 end
+

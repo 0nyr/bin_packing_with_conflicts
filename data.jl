@@ -123,3 +123,4 @@ function check_solution_viability(sol, J, w, E, W)
         end
     end
 end
+
