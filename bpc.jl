@@ -198,7 +198,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         binarized_pos_child_E[item_j][item_i] = true
     end
 
-    filter!((x) -> !any(Bool[binarized_E[i][k] || binarized_E[j][k] for (k, val) in enumerate(x) if val > .5]), pos_child.S)
+    filter!((x) -> !any(Bool[binarized_pos_child_E[i][k] || binarized_pos_child_E[j][k] for (k, val) in enumerate(x) if val > .5]), pos_child.S)
 
 
 
