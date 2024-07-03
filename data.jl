@@ -76,8 +76,17 @@ function write_to_file(J, w, E, W, filepath)
 end
 
 function check_solution_viability(sol, J, w, E, W)
-
+    
+    println("J: $(1):$(length(J))")
+    println("W: $(W)")
+    println("w: $(w)")
+    println("E: $(E)\n\n")
+    
     println("Bins amount: $(length(sol))")
+    println("solution:")
+    for i in sol
+        println("\t$(i)")
+    end
 
     missing_item = Bool[true for j in J]
 

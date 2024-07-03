@@ -186,7 +186,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     pos_child.J, pos_child.w = merge_items(i, j, J, original_w, pos_child.item_address)
 
     # filter bags that are now too heavy after the merge
-    filter!((x) -> sum([node.w[k] for (k, val) in enumerate(x) if val > .5]) < pos_child.W, pos_child.S)
+    filter!((x) -> sum([pos_child.w[k] for (k, val) in enumerate(x) if val > .5]) < pos_child.W, pos_child.S)
 
 
     # Adding positive child to list
