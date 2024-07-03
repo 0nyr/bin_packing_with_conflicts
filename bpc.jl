@@ -1252,8 +1252,10 @@ function solve_bpc(
             # get solution values
             lambda_bar = value.(lambdas)
             x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
-
-            println("x_bar = $(Vector{Int64}[Int64[k for (k,v) in enumerate(bin) if v > 0.5] for bin in x_bar])")
+            
+            
+            println("x_bar_unbin = $(Vector{Int64}[Int64[k for (k,v) in enumerate(bin) if v > 0.5] for bin in x_bar])")
+            println("x_bar_values = $(Vector{Vector{Float64}}[Vector{Float64}[Float64[k,v] for (k,v) in enumerate(bin) if v > 0] for bin in x_bar])")
         
             # treat current solution
             current_solution = round_up_solution(x_bar)
