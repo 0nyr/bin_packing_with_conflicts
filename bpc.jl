@@ -719,7 +719,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         if p_obj < -epsilon
 
             # price
-            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+            # verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(Int64[n for (n, v) in enumerate(q) if v > .5])")
             # if using_dp # checking if dp is correct
             #     println(LOG_IO, "p_obj: $(p_obj), adding lambda: $([i for (i, j) in enumerate(q) if j > .5])")
             #     chk_obj, chk_bin = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=0, epsilon=epsilon)
@@ -1157,7 +1157,7 @@ function solve_bpc(
         end
 
         max_cuts = length(J)/2
-        max_cuts_per_node = 10
+        max_cuts_per_node = 0
         cuts_added_this_node = 0
         
         lambda_bar = Float64[]
