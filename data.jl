@@ -115,7 +115,15 @@ function check_solution_viability(sol, J, w, E, W)
         end
 
         if any(conflicts[i] .&& bins_binarized[i])
-            println("bin $(i) has conflicting items")
+            println("bin $(i) has conflicting items:")
+            for j in J
+                for k in j+1:length(J)
+                    if bins_binarized[i][j] && bins_binarized[i][k] && binarized_E[j][k] 
+                        println("\titem $(j) conflics with item $(k)")
+                    end
+                end
+            end
+
         end
 
         bin_weight = sum(bins_binarized[i] .* w)

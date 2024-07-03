@@ -387,7 +387,7 @@ reduced_cost(x, pi_bar, J) = 1 - sum([pi_bar[j]*x[j] for j ∈ J])
 
 # FUNCTIONS FOR DEBUGGING
 function print_node_status(node)
-    println("best node = $(node.id)")
+    println("best_node = $(node.id)")
     println("J = $(node.J)")
     println("w = $(node.w)")
     println("E = $(translate_edges(node.E, node.item_address))")
