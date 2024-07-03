@@ -9,7 +9,7 @@ do_compile_run = false
 do_compile_run = true
 
 verbose=0
-verbose=4
+verbose=1
 
 if do_compile_run
     # first run to compile

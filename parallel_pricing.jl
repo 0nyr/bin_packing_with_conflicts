@@ -234,6 +234,11 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
     #     end
     # end
     # println("new_bin: $(best_label.items)")
+
+    if best_label.weight > W
+        error("label $(best_label) is too heavy: $(best_label.weight)")
+    end
+
     return min_rcost, best_label.items
 end
 
