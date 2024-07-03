@@ -604,12 +604,12 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
     
     best_x = Float64[0.0 for j in J]
     best_obj = -Inf
-    k=1
+    k=2
     for n in n_min:n_max
 
         set_normalized_rhs(main_constraint, n)
 
-        for k in 1:n
+        for k in 2:n
         
             for (p, l) in enumerate(lambda_bar)
                 for j in J
@@ -1177,6 +1177,8 @@ function solve_bpc(
             # try to find subset row cuts
             violation, k, cut_data = cut_separation(J, lambda_bar, S)
             if violation > 0
+                println(LOG_IO, "adding cut with k = $(k): $(cut_data)")
+
 
                 # add cut data to node
                 push!(node.subset_row_cuts, cut_data)
