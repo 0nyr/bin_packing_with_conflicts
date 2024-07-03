@@ -28,6 +28,7 @@ mutable struct Node
     bounds_status::Int64 # 0: not optimal, 1: locally optimized, 2: globally optimized 
     subset_row_cuts::Vector{Vector{Int64}} # cut_i for i in cuts | cut_i = [Si_1, Si_2 ... Si_n] 
     subset_row_k::Vector{Int64} # k_i for i in cuts
+    branch_history::Vector{Vector{Int64}} # (is_merge, i, j) for each branch
 end
 
 
@@ -176,6 +177,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         0, # bounds_status
         new_sr_cuts,
         new_k,
+        vcat(node.branch_history, Vector{Int64}[[1, i, j]])
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
 
@@ -216,6 +218,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         0, # bounds_status
         deepcopy(node.subset_row_cuts),
         deepcopy(node.subset_row_k),
+        vcat(node.branch_history, Vector{Int64}[[0, i, j]])
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
     
@@ -838,6 +841,7 @@ function solve_bpc(
         0, # bounds_status
         Vector{Int64}[],
         Int64[],
+        Vector{Int64}[],
     )]
     
     best_node = Node[nodes[1]]
@@ -1283,7 +1287,13 @@ function solve_bpc(
     println("E = $(translate_edges(node.E, node.item_address))")
     println("W = $(node.W)")
     println("sol = $(Vector{Int64}[Int64[j for (j, val) in enumerate(bin) if val > 0.5] for bin in node.solution])")
+
+    println("\n\n")
+
     println("item_address = $(node.item_address)")
+    println("original_w = $(original_w)")
+    println("branch_history = $(node.branch_history)")
+
 
     verbose >= 1 && println(LOG_IO, "tree finished")
     
