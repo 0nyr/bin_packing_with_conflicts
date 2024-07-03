@@ -17,7 +17,7 @@ mutable struct Node
     E::Vector{Vector{Int64}}
     w::Vector{Int64}
     W::Int64
-    S::Vector{Vector{Float64}} # needs to be pruned after a Ryan-Foster merge!
+    S::Vector{Vector{Float64}} # lambdas
     mandatory_bags::Vector{Vector{Int64}} # mandatory q ∈ S
     mandatory_bag_amount::Int64
     forbidden_bags::Vector{Vector{Int64}} # forbidden q ∈ S
@@ -1277,6 +1277,7 @@ function solve_bpc(
 
     node = best_node[1]
 
+    println("best node = $(node.id)")
     println("J = $(node.J)")
     println("w = $(node.w)")
     println("E = $(translate_edges(node.E, node.item_address))")
