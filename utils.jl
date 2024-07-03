@@ -397,9 +397,11 @@ function print_node_status(node, original_w)
     println("\n\n")
 
     println("item_address_enum = $([i for i in enumerate(node.item_address)])")
+    println("adress_item_enum = $( sort([(i[2], i[1]) for i in enumerate(node.item_address)]) )")
+
     println("original_w = $(original_w)")
     println("branch_history = $(node.branch_history)")
-    println("original_E = $(node.E)")
+    println("E_on_original_G = $(node.E)")
 end
 
 function search_code(target, S)

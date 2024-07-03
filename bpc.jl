@@ -189,6 +189,20 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     filter!((x) -> sum([pos_child.w[k] for (k, val) in enumerate(x) if val > .5]) < pos_child.W, pos_child.S)
 
 
+    # filter bags that are now in conflict after the merge
+    translated_pos_child_E = translate_edges(pos_child.E, pos_child.item_address)
+
+    binarized_pos_child_E = BitVector[falses(length(pos_child.J)) for _ in pos_child.J]
+    for (item_i, item_j) in translated_pos_child_E
+        binarized_pos_child_E[item_i][item_j] = true
+        binarized_pos_child_E[item_j][item_i] = true
+    end
+
+    filter!((x) -> !any(Bool[binarized_E[i][k] || binarized_E[j][k] for (k, val) in enumerate(x) if val > .5]), pos_child.S)
+
+
+
+
     # Adding positive child to list
     push!(nodes, pos_child)
     println(LOG_IO, "added node $(pos_child.id) to list")            
