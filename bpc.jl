@@ -208,7 +208,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
     # pass important bags to child, while removing bags that violate the new conflict
-    new_S = Vector{Float64}[node.S[q] for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
+    # new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
+    new_S = Vector{Float64}[]
 
     # split branch
     # neg_child = deepcopy(node)
@@ -216,7 +217,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     neg_child = Node(
         node_counter[1]+2, # id
         # 1*node.priority,
-        length(node.J)+length(node.E)+1,
+        # length(node.J)+length(node.E)+1,
+        length(node.J)+length(node.E) - 100000,
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),

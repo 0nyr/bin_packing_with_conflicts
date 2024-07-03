@@ -28,6 +28,7 @@ global_logger(logger) # set as default logger
 # csv with time and details file
 csv_table = open("time.csv", "a")
 
+error("done!")
 
 # Files
 folder_path = "test"

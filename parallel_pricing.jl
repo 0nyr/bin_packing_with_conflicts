@@ -146,12 +146,13 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
                 deepcopy(curr_label.items), 
                 new_next_conflicts,
                 # curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+                deepcopy(curr_label.m),
                 sigma,
             )
 
             new_label.items[i] = true
-            update_m(label, i, cuts_binary_data)
-            update_fcost(label, sigma, sr_k)
+            update_m(new_label, i, cuts_binary_data)
+            update_fcost(new_label, sigma, sr_k)
 
             # check for domination
             dominated = Dict{Label, Nothing}()
