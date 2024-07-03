@@ -1275,9 +1275,18 @@ function solve_bpc(
         end
     end
 
+    node = best_node[1]
+
+    println("J = $(node.J)")
+    println("w = $(node.w)")
+    println("E = $(translate_edges(node.E, node.item_address))")
+    println("W = $(node.W)")
+    println("sol = $(Vector{Int64}[Int64[j for (j, val) in enumerate(bin) if val > 0.5] for bin in node.solution])")
+    println("item_address = $(node.item_address)")
+
     verbose >= 1 && println(LOG_IO, "tree finished")
     
-    solution = translate_solution(best_node[1], epsilon=epsilon)
+    solution = translate_solution(node, epsilon=epsilon)
     final_solution = get_pretty_solution(solution, bounds[2])
 
     println(LOG_IO, "bounds: $(bounds)")

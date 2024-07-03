@@ -77,6 +77,8 @@ end
 
 function check_solution_viability(sol, J, w, E, W)
 
+    println("Bins amount: $(length(sol))")
+
     missing_item = Bool[true for j in J]
 
     binarized_E = BitVector[falses(length(J)) for j in J]
