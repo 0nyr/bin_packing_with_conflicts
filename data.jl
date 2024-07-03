@@ -77,6 +77,8 @@ end
 
 function check_solution_viability(sol, J, w, E, W)
     
+    raise_error = false
+
     println("J: $(1):$(length(J))")
     println("W: $(W)")
     println("w: $(w)")

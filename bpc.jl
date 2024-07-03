@@ -1297,19 +1297,7 @@ function solve_bpc(
 
     node = best_node[1]
 
-    println("best node = $(node.id)")
-    println("J = $(node.J)")
-    println("w = $(node.w)")
-    println("E = $(translate_edges(node.E, node.item_address))")
-    println("W = $(node.W)")
-    println("sol = $(Vector{Int64}[Int64[j for (j, val) in enumerate(bin) if val > 0.5] for bin in node.solution])")
-
-    println("\n\n")
-
-    println("item_address = $(node.item_address)")
-    println("original_w = $(original_w)")
-    println("branch_history = $(node.branch_history)")
-
+    print_node_status(node, original_w)
 
     verbose >= 1 && println(LOG_IO, "tree finished")
     
