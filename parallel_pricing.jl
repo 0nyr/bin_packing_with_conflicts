@@ -139,7 +139,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
             new_label = Label(
                 curr_label.rcost - rc[i], 
-                0,
+                0.0,
                 new_weight, 
                 i, 
                 # Label[curr_label], 
