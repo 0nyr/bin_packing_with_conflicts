@@ -217,8 +217,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     neg_child = Node(
         node_counter[1]+2, # id
         # 1*node.priority,
-        # length(node.J)+length(node.E)+1,
-        length(node.J)+length(node.E) - 100000,
+        length(node.J)+length(node.E)+1,
+        # length(node.J)+length(node.E) - 100000,
         deepcopy(node.J),
         deepcopy(node.E),
         deepcopy(node.w),
