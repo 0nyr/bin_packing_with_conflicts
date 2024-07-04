@@ -1221,7 +1221,6 @@ function solve_bpc(
                 push!(node.subset_row_cuts, cut_data)
                 push!(node.subset_row_k, k)
                 n = length(node.subset_row_cuts)
-                n += 1
                 
                 # add cut to master
                 av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
