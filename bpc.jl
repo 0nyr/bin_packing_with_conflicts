@@ -556,6 +556,16 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     
     p_obj = objective_value(price)
     verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
+
+    new_x_bar = value.(price[:x])
+
+    println("sigma: $(sigma_bar)")
+    println("m: $(Int64[ length(Int64[j for j in cut if new_x_bar[j] > 0.5]) for cut in sr_cuts ])")
+    println("k: $(sr_k)")
+    println("rcost: $(p_obj)")
+    println("fcost: $(p_obj)")
+    println("")
+
         
     return p_obj, value.(price[:x])
 end
@@ -689,6 +699,8 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
         # get values to build price
         m_obj = objective_value(master)
+        println("m_obj: $(m_obj)")
+
         pi_bar = dual.(demand_constraints_ref)
         if isempty(cut_constraints_ref) # trying to get from an empty array will raise error
             sigma_bar = Float64[]
@@ -707,7 +719,6 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             p_obj, q = price_function(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, cuts_binary_data, verbose=verbose, epsilon=epsilon)
         end
 
-        println("m_obj: $(m_obj)")
         println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
         println("p_obj: $(p_obj)")
 
@@ -1060,7 +1071,7 @@ function solve_bpc(
         set_silent(master)
         
         # add the naive solution as lambda variables
-        S = deepcopy(node.S)
+        # S = deepcopy(node.S)
         for q in naive_solution
             if !(q ∈ S) # pass the relevant bags to S
                 push!(S, q)
@@ -1089,13 +1100,14 @@ function solve_bpc(
         artificial_variables = VariableRef[]
         demand_constraints_ref = ConstraintRef[]
         for i in J
-            au = @variable(master, lower_bound=0, base_name="a_u_$(i)")
-            al = @variable(master, lower_bound=0, base_name="a_l_$(i)")
+            # au = @variable(master, lower_bound=0, base_name="a_u_$(i)")
+            # al = @variable(master, lower_bound=0, base_name="a_l_$(i)")
+            # con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
+            # push!(artificial_variables, au, al)
+            # push!(demand_constraints_ref, con_ref)
 
-            con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
-
-            push!(artificial_variables, au, al)
-            push!(demand_constraints_ref, con_ref)
+            con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
+            push!(demand_constraints_ref, con_ref)            
         end
 
         # subset_row_cuts (Jepsen, 2008)
@@ -1115,7 +1127,8 @@ function solve_bpc(
     
         # objective function
         # @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables) + 10000*item_amount*sum(cut_artificial_variables))
-        @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables))
+        # @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables))
+        @objective(master, Min, sum(lambdas))
     
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
@@ -1194,7 +1207,7 @@ function solve_bpc(
         while continue_adding_cuts # cga and cut adding loop
         # for i in 1:max_cuts_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
+            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=false)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
