@@ -210,12 +210,12 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
     # if fast_labelling && !was_extended
 
-    min_rcost = Inf
+    min_fcost = Inf
     best_label = nothing
     for bucket in buckets
         for label in bucket
-            if label.rcost < min_rcost
-                min_rcost = label.rcost
+            if label.fcost[1] < min_rcost
+                min_fcost = label.fcost[1]
                 best_label = label
             end
         end
@@ -243,7 +243,13 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
         error("label $(best_label) is too heavy: $(best_label.weight)")
     end
 
-    return min_rcost, best_label.items
+    println("sigma: $(sigma)")
+    println("m: $(best_label.m)")
+    println("k: $(sr_k)")
+    println("rcost: $(best_label.rcost)")
+    println("fcost: $(best_label.fcost[1])")
+
+    return min_fcost, best_label.items
 end
 
 
