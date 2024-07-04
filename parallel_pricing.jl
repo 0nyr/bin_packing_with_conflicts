@@ -2,13 +2,14 @@ using DataStructures
 
 struct Label
     rcost::Float64 # less is better
-    fcost::Float64 # reduced cost considering cut violations (less is better)
+    fcost::Vector{Float64} # reduced cost considering cut violations (less is better)
     weight::Int64 # current weight
     last_item_added::Int # item added in this label
     items::BitVector # items in the bin so far
     conflicts::BitVector # conflics that will be found by moving forward
     m::Vector{Int64} # amount of custumers involved in cut i for i in cuts: |S_i ∩ V(L)|
     sigma_ref::Vector{Float64} # necessary for dominance criteria...
+    k_ref::Vector{Int64} # necessary for dominance criteria...
 end
 
 # auxiliary stuff
@@ -34,6 +35,7 @@ function Base.isless(l1::Label, l2::Label)
                     
                     for (q, is_negative) in enumerate(negative_sigma) # start by checking sigma, most likely positive 
                         if is_negative
+                            sr_k = l1.k_ref
                             # tau_l1 > tau_l2 ?
                             if l1.m[q] % sr_k[q] > l2.m[q] % sr_k[q] 
                                 sum_sigma_q_in_Q += l1.sigma_ref[q]     
@@ -42,7 +44,7 @@ function Base.isless(l1::Label, l2::Label)
                     end
                 end
             end
-            return l1.fcost - sum_sigma_q_in_Q <= l2.fcost
+            return l1.fcost[1] - sum_sigma_q_in_Q <= l2.fcost[1]
         else
             return false
         end
@@ -56,14 +58,14 @@ end
 function update_m(label, i, cuts_binary_data)
     for (k, cut_k) in enumerate(cuts_binary_data)
         if cut_k[i]
-            label.m += 1
+            label.m[k] += 1
         end
     end
 end
 
 "Updates the label final cost (the reduced cost considering cut violations)"
-function update_fcost(label::Label, sigma::Vector{Float64}, sr_k::Int64)
-    label.fcost = label.rcost - sigma.*floor.(label.m ./ sr_k)
+function update_fcost(label::Label, sigma::Vector{Float64}, sr_k::Vector{Int64})
+    label.fcost[1] = label.rcost - sum(sigma.*floor.(label.m ./ sr_k))
 end
 
 "Dynamic programming (labelling) price"
@@ -84,7 +86,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
         # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-        label = Label(1-rc[i], 0.0, w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma)
+        label = Label(1-rc[i], Float64[0.0], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma, sr_k)
         label.items[i] = true
         update_m(label, i, cuts_binary_data)
         update_fcost(label, sigma, sr_k)
@@ -139,7 +141,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
             new_label = Label(
                 curr_label.rcost - rc[i], 
-                0.0,
+                Float64[0.0],
                 new_weight, 
                 i, 
                 # Label[curr_label], 
@@ -148,6 +150,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
                 # curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
                 deepcopy(curr_label.m),
                 sigma,
+                sr_k,
             )
 
             new_label.items[i] = true

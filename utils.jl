@@ -98,7 +98,7 @@ function find_ryan_foster_branch(bags_in_use, lambda_bar, S, w; epsilon=1e-4)
     bag_closest = 1
     for q in bags_in_use
         
-        items_in_q = Int64[i for (i, val) in enumerate(S[q]) if val > epsilon] 
+        items_in_q = Int64[i for (i, val) in enumerate(S[q]) if val > 0.5] 
 
         # println(LOG_IO, "checking integrality of $(q)")
 

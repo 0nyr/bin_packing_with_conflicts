@@ -100,7 +100,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     available_to_merge = Int64[i for i in items_in_q if i != j]
     # println(LOG_IO, "available_to_merge: $(available_to_merge)")
             
-    # get largest item in bag, except the fractional item
+    # get largest item in bag
     _, i_index = findmax(x -> w[x], available_to_merge)
     i = available_to_merge[i_index]
 
@@ -208,8 +208,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
     # pass important bags to child, while removing bags that violate the new conflict
-    # new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
-    new_S = Vector{Float64}[]
+    new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
+    # new_S = Vector{Float64}[]
 
     # split branch
     # neg_child = deepcopy(node)
@@ -666,7 +666,7 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
 end
 
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=false)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
     m_obj = Inf
 
@@ -683,8 +683,8 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
     end
 
     # get constraints references
-    demand_constraints = get_demand_constraints(master, J)
-    cut_constraints = get_cut_constraints(master, length(subset_row_cuts))
+    # demand_constraints = get_demand_constraints(master, J)
+    # cut_constraints = get_cut_constraints(master, length(subset_row_cuts))
 
     # run price, add new columns, check solution, repeat if necessary
     for iteration in 1:max_iter
@@ -699,11 +699,11 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
         # get values to build price
         m_obj = objective_value(master)
-        pi_bar = dual.(demand_constraints)
-        if isempty(cut_constraints) # trying to get from an empty array will raise error
+        pi_bar = dual.(demand_constraints_ref)
+        if isempty(cut_constraints_ref) # trying to get from an empty array will raise error
             sigma_bar = Float64[]
         else
-            sigma_bar = dual.(cut_constraints)
+            sigma_bar = dual.(cut_constraints_ref)
         end
 
         verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
@@ -721,7 +721,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         if p_obj < -epsilon
 
             # price
-            # verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(Int64[n for (n, v) in enumerate(q) if v > .5])")
             # if using_dp # checking if dp is correct
             #     println(LOG_IO, "p_obj: $(p_obj), adding lambda: $([i for (i, j) in enumerate(q) if j > .5])")
             #     chk_obj, chk_bin = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=0, epsilon=epsilon)
@@ -753,7 +753,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             # set coefficient of new variable on demand constraints
             for i in J
                 if S[end][i] > 0.5
-                    set_normalized_coefficient(demand_constraints[i], lambdas[end], S[end][i])
+                    set_normalized_coefficient(demand_constraints_ref[i], lambdas[end], S[end][i])
                 end
             end
 
@@ -761,7 +761,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             for (i, cut) in enumerate(subset_row_cuts)
                 for j in cut
                     if S[end][j] > 0.5
-                        set_normalized_coefficient(cut_constraints[i], lambdas[end], 1)
+                        set_normalized_coefficient(cut_constraints_ref[i], lambdas[end], 1)
                     end
                 end
             end
@@ -1078,24 +1078,29 @@ function solve_bpc(
         
         # demand constraints and artificial variables
         artificial_variables = VariableRef[]
+        demand_constraints_ref = ConstraintRef[]
         for i in J
             au = @variable(master, lower_bound=0, base_name="a_u_$(i)")
             al = @variable(master, lower_bound=0, base_name="a_l_$(i)")
 
-            @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
+            con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
 
             push!(artificial_variables, au, al)
+            push!(demand_constraints_ref, con_ref)
         end
 
         # subset_row_cuts (Jepsen, 2008)
         cut_artificial_variables = VariableRef[]
+        cut_constraints_ref = ConstraintRef[]
         for (n, cut_n) in enumerate(node.subset_row_cuts)
             av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
             k = node.subset_row_k[n]
             row_subset = cut_n
 
-            @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
+            con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
+            
             push!(cut_artificial_variables, av_cut)
+            push!(cut_constraints_ref, con_ref)
         end
     
         # objective function
@@ -1159,7 +1164,7 @@ function solve_bpc(
         end
 
         max_cuts = length(J)/2
-        max_cuts_per_node = 0
+        max_cuts_per_node = 10
         cuts_added_this_node = 0
         
         lambda_bar = Float64[]
@@ -1169,7 +1174,7 @@ function solve_bpc(
         while continue_adding_cuts # cga and cut adding loop
         # for i in 1:max_cuts_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=dp)
+            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
@@ -1216,12 +1221,18 @@ function solve_bpc(
                 push!(node.subset_row_cuts, cut_data)
                 push!(node.subset_row_k, k)
                 n = length(node.subset_row_cuts)
+                n += 1
                 
                 # add cut to master
                 av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
-                
-                @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
                 push!(cut_artificial_variables, av_cut)
+                
+                con_ref = @constraint(master, -av_cut + sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
+
+                set_objective_function(master, objective_function(master) + 1000*item_amount*av_cut)
+
+                # add to constraint to reference array
+                push!(cut_constraints_ref, con_ref)
 
                 # update auxiliary cut data
                 push!(cuts_binary_data, falses(J_len))
@@ -1231,6 +1242,8 @@ function solve_bpc(
 
                 cuts_added_this_node += 1
                 
+                println(master)
+
             else
                 break
             end
@@ -1268,7 +1281,9 @@ function solve_bpc(
             q = S[most_fractional_bag]
             j = most_fractional_item
 
-            # println(LOG_IO, "q: $(q)")
+            println(LOG_IO, "enum_q: $([i for i in enumerate(q)])")
+            println(LOG_IO, "j: $(j)")
+
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data)
             node_counter[1] += 2
