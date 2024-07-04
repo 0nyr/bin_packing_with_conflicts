@@ -722,6 +722,8 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             # price
             verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+            println("last lambda: $(value.(lambdas)[max(end-10, 1):end])")
+
             # if using_dp # checking if dp is correct
             #     println(LOG_IO, "p_obj: $(p_obj), adding lambda: $([i for (i, j) in enumerate(q) if j > .5])")
             #     chk_obj, chk_bin = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=0, epsilon=epsilon)
@@ -741,7 +743,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             # add new packing scheme to list
             push!(S, q)
-            
+
             S_len += 1
 
             # create new lambda
