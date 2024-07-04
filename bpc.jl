@@ -666,25 +666,11 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
 end
 
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
+function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
     m_obj = Inf
 
     # global print_once = [false]
-
-    if using_dp
-        len_J = length(J)
-        binarized_E = BitVector[falses(len_J) for i in J]
-
-        for (i, j) in E
-            binarized_E[i][j] = true
-            binarized_E[j][i] = true
-        end
-    end
-
-    # get constraints references
-    # demand_constraints = get_demand_constraints(master, J)
-    # cut_constraints = get_cut_constraints(master, length(subset_row_cuts))
 
     # run price, add new columns, check solution, repeat if necessary
     for iteration in 1:max_iter
@@ -1165,6 +1151,16 @@ function solve_bpc(
             end
         end
 
+        # binarized E, for fast conflict checks
+        len_J = length(J)
+        binarized_E = BitVector[falses(len_J) for i in J]
+
+        for (i, j) in E
+            binarized_E[i][j] = true
+            binarized_E[j][i] = true
+        end
+
+
         max_cuts = length(J)/2
         max_cuts_per_node = 10
         cuts_added_this_node = 0
@@ -1176,7 +1172,7 @@ function solve_bpc(
         while continue_adding_cuts # cga and cut adding loop
         # for i in 1:max_cuts_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
+            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
