@@ -249,6 +249,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
     println("k: $(sr_k)")
     println("rcost: $(best_label.rcost)")
     println("fcost: $(best_label.fcost[1])")
+    println("")
 
     return min_fcost, best_label.items
 end

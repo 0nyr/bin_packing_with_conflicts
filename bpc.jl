@@ -710,7 +710,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         if p_obj < -epsilon
 
             # price
-            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda: $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
             println("last lambda: $(value.(lambdas)[max(end-10, 1):end])")
 
             # if using_dp # checking if dp is correct
@@ -1096,18 +1096,20 @@ function solve_bpc(
         cut_artificial_variables = VariableRef[]
         cut_constraints_ref = ConstraintRef[]
         for (n, cut_n) in enumerate(node.subset_row_cuts)
-            av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
+            # av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
             k = node.subset_row_k[n]
             row_subset = cut_n
 
+            # con_ref = @constraint(master, -av_cut + sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
             con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
             
-            push!(cut_artificial_variables, av_cut)
+            # push!(cut_artificial_variables, av_cut)
             push!(cut_constraints_ref, con_ref)
         end
     
         # objective function
-        @objective(master, Min, sum(lambdas) + 1000*item_amount*sum(artificial_variables) + 1000*item_amount*sum(cut_artificial_variables))
+        # @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables) + 10000*item_amount*sum(cut_artificial_variables))
+        @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables))
     
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
@@ -1170,14 +1172,14 @@ function solve_bpc(
         len_J = length(J)
         binarized_E = BitVector[falses(len_J) for i in J]
 
-        for (i, j) in E
+        for (i, j) in translated_E
             binarized_E[i][j] = true
             binarized_E[j][i] = true
         end
 
 
         max_cuts = length(J)/2
-        max_cuts_per_node = 10
+        max_cuts_per_node = 0
         cuts_added_this_node = 0
         
         lambda_bar = Float64[]
@@ -1236,12 +1238,13 @@ function solve_bpc(
                 n = length(node.subset_row_cuts)
                 
                 # add cut to master
-                av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
-                push!(cut_artificial_variables, av_cut)
+                # av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
+                # push!(cut_artificial_variables, av_cut)
                 
-                con_ref = @constraint(master, -av_cut + sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
+                # con_ref = @constraint(master, -av_cut + sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
+                con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
 
-                set_objective_function(master, objective_function(master) + 1000*item_amount*av_cut)
+                # set_objective_function(master, objective_function(master) + 10000*item_amount*av_cut)
 
                 # add to constraint to reference array
                 push!(cut_constraints_ref, con_ref)
