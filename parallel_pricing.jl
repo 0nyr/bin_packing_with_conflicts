@@ -45,6 +45,7 @@ function Base.isless(l1::Label, l2::Label)
                 end
             end
             return l1.fcost[1] - sum_sigma_q_in_Q <= l2.fcost[1]
+            # return l1.fcost[1] <= l2.fcost[1]
         else
             return false
         end
@@ -214,7 +215,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
     best_label = nothing
     for bucket in buckets
         for label in bucket
-            if label.fcost[1] < min_rcost
+            if label.fcost[1] < min_fcost
                 min_fcost = label.fcost[1]
                 best_label = label
             end
