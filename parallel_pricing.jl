@@ -29,7 +29,7 @@ function Base.isless(l1::Label, l2::Label)
             if length(l1.m) != 0
                 
                 # get sigmas smaller than zero
-                negative_sigma = l1.sigma_ref .< 1e-4
+                negative_sigma = l1.sigma_ref .< -1e-4
             
                 if any(negative_sigma)
                     
