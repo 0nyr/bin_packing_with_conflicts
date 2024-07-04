@@ -517,7 +517,7 @@ function first_fit_decreasing_with_conflicts(J, w, W, E, conflicts; verbose=true
 end
 
 "Runs pricing linear programming"
-function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
+function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_k, cuts_binary_data; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
@@ -533,6 +533,7 @@ function price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4
     for (i, q) in enumerate(forbidden_bags)
         @constraint(price, sum([q[j]*x[j] + (1-q[j])*(1-x[j]) for j in J]) <= length(J) - 1, base_name="forbidden_bag_$(i)")
     end
+
     
     # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
     @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
@@ -668,6 +669,8 @@ end
 
 function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
+    len_J = length(J)
+
     m_obj = Inf
 
     # global print_once = [false]
@@ -701,7 +704,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             positive_rcost = Bool[i > 0 for i in pi_bar]
             p_obj, q = dp_price(J, len_J, pi_bar, sigma_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, sr_k, verbose=verbose, epsilon=epsilon)
         else
-            p_obj, q = price_function(pi_bar, w, W, J, E, S, forbidden_bags, verbose=verbose, epsilon=epsilon)
+            p_obj, q = price_function(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, cuts_binary_data, verbose=verbose, epsilon=epsilon)
         end
 
         if p_obj < -epsilon
@@ -726,6 +729,10 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             #     error("here!")
             # end
+
+            if q == S[end]
+                error("repeated bin")
+            end
 
             # add new packing scheme to list
             push!(S, q)
@@ -753,6 +760,14 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
                     end
                 end
             end
+
+            println("objective_function: $(objective_function(master))")
+            if !isempty(cut_constraints_ref)
+                println("cut: $(subset_row_cuts[end])")
+                println("cut constraint: $(cut_constraints_ref[end])")
+            end
+            println("\n\n")
+
 
             # show updated master
             verbose >= 3 && println(LOG_IO, master)
