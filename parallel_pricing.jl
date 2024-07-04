@@ -65,8 +65,8 @@ function update_m(label, i, cuts_binary_data)
 end
 
 "Updates the label final cost (the reduced cost considering cut violations)"
-function update_fcost(label::Label, sigma::Vector{Float64}, sr_k::Vector{Int64})
-    label.fcost[1] = label.rcost - sum(sigma.*floor.(label.m ./ sr_k))
+function update_fcost(label::Label)
+    label.fcost[1] = label.rcost - sum(label.sigma_ref.*floor.(label.m ./ label.k_ref))
 end
 
 "Dynamic programming (labelling) price"
@@ -90,7 +90,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
         label = Label(1-rc[i], Float64[0.0], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma, sr_k)
         label.items[i] = true
         update_m(label, i, cuts_binary_data)
-        update_fcost(label, sigma, sr_k)
+        update_fcost(label)
 
         push!(buckets[i], label)
 
@@ -156,11 +156,10 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
             new_label.items[i] = true
             update_m(new_label, i, cuts_binary_data)
-            update_fcost(new_label, sigma, sr_k)
+            update_fcost(new_label)
 
             # check for domination
             dominated = Dict{Label, Nothing}()
-            clean_bucket = false
             clean_matrix = false
             new_label_is_dominated = false
             for label in buckets[i]

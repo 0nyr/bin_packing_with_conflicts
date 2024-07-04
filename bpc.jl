@@ -607,7 +607,7 @@ function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose
 end
 
 "Searches for subset row cuts"
-function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_max=5)
+function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_max=3)
     # price = Model(Gurobi.Optimizer)
     cut_separator = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(cut_separator)
@@ -631,7 +631,8 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_ma
 
         set_normalized_rhs(main_constraint, n)
 
-        for k in 2:n
+        # for k in 2:n
+        for k in 2:2
         
             for (p, l) in enumerate(lambda_bar)
                 for j in J
@@ -697,8 +698,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
         verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
         
-        # m_obj, demand_constraints, pi_bar = get_master_data_for_pricing(master, J, subset_row_cuts, verbose=verbose)
-        
+
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
@@ -707,11 +707,12 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             p_obj, q = price_function(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, cuts_binary_data, verbose=verbose, epsilon=epsilon)
         end
 
-        if p_obj < -epsilon
+        println("m_obj: $(m_obj)")
+        println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
+        println("p_obj: $(p_obj)")
 
-            # price
-            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
-            println("last lambda: $(value.(lambdas)[max(end-10, 1):end])")
+
+        if p_obj < -epsilon
 
             # if using_dp # checking if dp is correct
             #     println(LOG_IO, "p_obj: $(p_obj), adding lambda: $([i for (i, j) in enumerate(q) if j > .5])")
@@ -729,6 +730,11 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             #     error("here!")
             # end
+
+
+            # price
+            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+
 
             if q == S[end]
                 error("repeated bin")
@@ -1169,8 +1175,7 @@ function solve_bpc(
         end
 
         # binarized E, for fast conflict checks
-        len_J = length(J)
-        binarized_E = BitVector[falses(len_J) for i in J]
+        binarized_E = BitVector[falses(J_len) for i in J]
 
         for (i, j) in translated_E
             binarized_E[i][j] = true
@@ -1179,7 +1184,7 @@ function solve_bpc(
 
 
         max_cuts = length(J)/2
-        max_cuts_per_node = 0
+        max_cuts_per_node = 10
         cuts_added_this_node = 0
         
         lambda_bar = Float64[]
