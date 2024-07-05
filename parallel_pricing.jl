@@ -239,7 +239,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
         # println("rcost: $(best_label.rcost)")
         # println("fcost: $(best_label.fcost[1])")
         
-        println("found $(length(good_labels)) bins")
+        # println("found $(length(good_labels)) bins")
         
         # println("")    
     end
