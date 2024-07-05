@@ -212,6 +212,11 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
     # Multiple labels!
     good_labels = vcat(Vector{Label}[filter((x) -> x.fcost[1] < -1e-4, bucket) for bucket in buckets]...)
 
+    if !isempty(good_labels)
+        avg_fcost = sum([i.fcost[1] for i in good_labels])/length(good_labels)
+        filter!((x) -> x < avg_fcost, good_labels)
+    end
+
     # Single label!
     min_fcost = Inf
     best_label = nothing
@@ -222,20 +227,23 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
         end
     end
 
-    if best_label.weight > W
-        error("label $(best_label) is too heavy: $(best_label.weight)")
+    if !isempty(good_labels)
+        if best_label.weight > W
+            error("label $(best_label) is too heavy: $(best_label.weight)")
+        end
+    
+        println("best new bin:")
+        println("sigma: $(sigma)")
+        println("m: $(best_label.m)")
+        println("k: $(sr_k)")
+        println("rcost: $(best_label.rcost)")
+        println("fcost: $(best_label.fcost[1])")
+        
+        println("found $(length(good_labels)) bins")
+        
+        println("")    
     end
 
-    println("best new bin:")
-    println("sigma: $(sigma)")
-    println("m: $(best_label.m)")
-    println("k: $(sr_k)")
-    println("rcost: $(best_label.rcost)")
-    println("fcost: $(best_label.fcost[1])")
-    
-    println("found $(length(good_labels)) bins")
-    
-    println("")
 
     # return min_fcost, best_label.items
     return min_fcost, Vector{Float64}[label.items for label in good_labels]
