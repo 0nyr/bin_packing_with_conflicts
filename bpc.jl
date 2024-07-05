@@ -402,6 +402,7 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
     # println(LOG_IO, "bag branching node $(node.id) into $(pos_child.id) and $(neg_child.id) done")
 end
 
+
 "adds new node to queue and node list"
 function register_node(node, nodes, queue)
 
@@ -503,6 +504,8 @@ function first_fit_decreasing_with_conflicts(J, w, W, E, conflicts; verbose=true
 
     return bags, bags_amount
 end
+
+
 
 "Runs pricing linear programming"
 function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_k; verbose=3, epsilon=1e-4)
@@ -854,6 +857,7 @@ function solve_bpc(
     dp::Bool=true,
     )
 
+
     item_amount = length(J)
 
     # [LB, UB]
@@ -896,6 +900,7 @@ function solve_bpc(
 
     is_optimal = true
 
+
     # Start the tree
     while !(isempty(nodes))
 
@@ -931,13 +936,16 @@ function solve_bpc(
             # update bounds status
             update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
             if node.bounds_status != 0 # should we continue processing this node?
+                
                 if node.bounds_status == 1 # no need to continue *this* node
                     # prune the tree
                     continue
                 else # global optimal
                     break
                 end
+            
             end
+        
         else
             not_first_node = true
         end
@@ -980,13 +988,16 @@ function solve_bpc(
             # update bounds status
             update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
             if node.bounds_status != 0 # is it a global or local optimal?
+            
                 if node.bounds_status == 1 # no need to continue
                     # prune the tree
                     continue
                 else # global optimal
                     break
                 end
+            
             end
+
         end
 
         # [conflicts of i for each i in J]
@@ -1011,17 +1022,21 @@ function solve_bpc(
                     # update bounds status
                     update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
                     if node.bounds_status != 0 # is it a global or local optimal?
+                        
                         if node.bounds_status == 1 # no need to continue
                             # prune the tree
                             continue
                         else # global optimal
                             break
                         end
+                    
                     end   
+                
                 end
 
                 initial_solution = deepcopy(ffd_solution)
             end
+
         else
             ffd_solution_is_good = false 
         end
@@ -1188,7 +1203,7 @@ function solve_bpc(
             violations, new_cuts_index = cut_separation_enum(J, lambda_bar, S, triplets, triplets_tracker, max_cuts_per_check)
             if isempty(new_cuts_index) # no cuts to add
                 break
-            end
+            else
                 checks_done_this_node += 1
                 for (t_index, v_index) in enumerate(new_cuts_index)
 
@@ -1211,7 +1226,7 @@ function solve_bpc(
                         cuts_binary_data[end][r] = true
                     end
     
-                    println(master)
+                    # println(master)
                 end
             end
         end
@@ -1258,7 +1273,7 @@ function solve_bpc(
                 sigma_bar = dual.(cut_constraints_ref)
             end
             cuts_in_use = Int64[k for (k,v) in enumerate(sigma_bar) if v < -epsilon]
-            println("σ_bar = $(sigma_bar)")
+            println("sigma_bar = $(sigma_bar)")
             println("cuts_in_use = $(cuts_in_use)")
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data, cuts_in_use)
