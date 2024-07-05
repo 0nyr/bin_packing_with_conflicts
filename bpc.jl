@@ -579,6 +579,7 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
 
     new_x_bar = value.(price[:x])
     
+    println("best new bin:")
     println("sigma: $(sigma_bar)")
     println("m: $(Int64[ length(Int64[j for j in cut if new_x_bar[j] > 0.5]) for cut in sr_cuts ])")
     println("k: $(sr_k)")
@@ -702,9 +703,10 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
-            p_obj, q = dp_price(J, len_J, pi_bar, sigma_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, sr_k, verbose=verbose, epsilon=epsilon)
+            p_obj, new_bins = dp_price(J, len_J, pi_bar, sigma_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, sr_k, verbose=verbose, epsilon=epsilon)
         else
             p_obj, q = price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, verbose=verbose, epsilon=epsilon)
+            new_bins = Vector{Float64}[q]
         end
 
         println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
@@ -731,51 +733,53 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
             #     error("here!")
             # end
 
+            for q in new_bins
 
-            # price
-            verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+                # price
+                verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
 
 
-            if q == S[end]
-                error("repeated bin")
-            elseif q ∈ S
-                error("AHA!")
-            end
-
-            # # check the value of lambdas added by the cga
-            # if check_next_lambda
-            #     if value(lambdas[end]) < epsilon
-            #         error("AHA!")
-            #     end
-            # else
-            #     check_next_lambda = true
-            # end
-
-            # add new packing scheme to list
-            push!(S, q)
-
-            S_len += 1
-
-            # create new lambda
-            push!(lambdas, @variable(master, lower_bound=0, base_name="λ_$(S_len)"))
-
-            # set variable cost on master
-            set_objective_function(master, objective_function(master) + lambdas[end])
-
-            # set coefficient of new variable on demand constraints
-            for i in J
-                if S[end][i] > 0.5
-                    set_normalized_coefficient(demand_constraints_ref[i], lambdas[end], S[end][i])
+                if q == S[end]
+                    error("repeated bin")
+                    # println("repeated bin, stopping cga")
+                elseif q ∈ S
+                    error("AHA!")
                 end
-            end
 
-            # set coefficient of new variable on cut constraints
-            for (i, cut) in enumerate(subset_row_cuts)
-                for j in cut
-                    if S[end][j] > 0.5
-                        set_normalized_coefficient(cut_constraints_ref[i], lambdas[end], 1)
+                # # check the value of lambdas added by the cga
+                # if check_next_lambda
+                #     if value(lambdas[end]) < epsilon
+                #         error("AHA!")
+                #     end
+                # else
+                #     check_next_lambda = true
+                # end
+
+                # add new packing scheme to list
+                push!(S, q)
+
+                S_len += 1
+
+                # create new lambda
+                push!(lambdas, @variable(master, lower_bound=0, base_name="λ_$(S_len)"))
+
+                # set variable cost on master
+                set_objective_function(master, objective_function(master) + lambdas[end])
+
+                # set coefficient of new variable on demand constraints
+                for i in J
+                    if S[end][i] > 0.5
+                        set_normalized_coefficient(demand_constraints_ref[i], lambdas[end], S[end][i])
                     end
                 end
+
+                # set coefficient of new variable on cut constraints
+                for (i, cut) in enumerate(subset_row_cuts)
+                    if S[end][j] > 0.5
+                        set_normalized_coefficient(cut_constraints_ref[i], lambdas[end], floor(sum([q[j] for j in cut])/2))
+                    end
+                end
+
             end
 
             println("objective_function: $(objective_function(master))")

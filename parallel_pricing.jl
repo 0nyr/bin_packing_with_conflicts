@@ -209,47 +209,36 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
     # if fast_labelling && !was_extended
 
+    # Multiple labels!
+    good_labels = vcat(Vector{Label}[filter((x) -> x.fcost[1] < -1e-4, bucket) for bucket in buckets]...)
+
+    # Single label!
     min_fcost = Inf
     best_label = nothing
-    for bucket in buckets
-        for label in bucket
-            if label.fcost[1] < min_fcost
-                min_fcost = label.fcost[1]
-                best_label = label
-            end
+    for label in good_labels
+        if label.fcost[1] < min_fcost
+            min_fcost = label.fcost[1]
+            best_label = label
         end
     end
-
-    # println("best label: ", best_label)
-
-    # new_bin = falses(len_J)
-    # if min_rcost < -epsilon && min_rcost < Inf
-    #     label = best_label
-        
-    #     done = false
-    #     while !done
-    #         new_bin[label.last_item_added] = true
-    #         if isempty(label.prev_lab) # is this the last label?
-    #             done = true
-    #         else
-    #             label = label.prev_lab[1]
-    #         end
-    #     end
-    # end
-    # println("new_bin: $(best_label.items)")
 
     if best_label.weight > W
         error("label $(best_label) is too heavy: $(best_label.weight)")
     end
 
+    println("best new bin:")
     println("sigma: $(sigma)")
     println("m: $(best_label.m)")
     println("k: $(sr_k)")
     println("rcost: $(best_label.rcost)")
     println("fcost: $(best_label.fcost[1])")
+    
+    println("found $(length(good_labels)) bins")
+    
     println("")
 
-    return min_fcost, best_label.items
+    # return min_fcost, best_label.items
+    return min_fcost, Vector{Float64}[label.items for label in good_labels]
 end
 
 
