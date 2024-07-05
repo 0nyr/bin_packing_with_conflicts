@@ -775,9 +775,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
 
                 # set coefficient of new variable on cut constraints
                 for (i, cut) in enumerate(subset_row_cuts)
-                    if S[end][j] > 0.5
-                        set_normalized_coefficient(cut_constraints_ref[i], lambdas[end], floor(sum([q[j] for j in cut])/2))
-                    end
+                    set_normalized_coefficient(cut_constraints_ref[i], lambdas[end], floor(sum([q[j] for j in cut])/2))
                 end
 
             end
