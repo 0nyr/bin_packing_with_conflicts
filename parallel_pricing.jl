@@ -70,7 +70,7 @@ function update_fcost(label::Label)
 end
 
 "Dynamic programming (labelling) price"
-function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}, sr_k::Vector{Int64}; verbose=3, epsilon=1e-4)
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}; verbose=3, epsilon=1e-4)
 
     # fast_labelling = false
 

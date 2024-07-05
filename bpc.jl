@@ -508,7 +508,7 @@ end
 
 
 "Runs pricing linear programming"
-function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_k; verbose=3, epsilon=1e-4)
+function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
@@ -528,13 +528,12 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     
 
     # Subset row cuts?
-    if !isempty(sr_k)
+    if !isempty(sr_cuts)
         
         # Subset row cuts!
-        @variable(price, z[1:length(sr_k)] >= 0, Int)
+        @variable(price, z[1:length(sr_cuts)] >= 0, Int)
         for (i, cut) in enumerate(sr_cuts)
-            a = 1/sr_k[i]
-            @constraint(price, z[i] >= sum([a*x[j] for j in cut]) - 1 + 1e-3, base_name="cut_$(i)")
+            @constraint(price, z[i] >= sum([0.5*x[j] for j in cut]) - 1 + 1e-3, base_name="cut_$(i)")
         end
 
         @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]) - sum([sigma_i*z[i] for (i, sigma_i) in enumerate(sigma_bar)]))
@@ -569,9 +568,8 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     println("best new bin:")
     println("sigma: $(sigma_bar)")
     println("m: $(Int64[ length(Int64[j for j in cut if new_x_bar[j] > 0.5]) for cut in sr_cuts ])")
-    println("k: $(sr_k)")
     
-    if !isempty(sr_k)    
+    if !isempty(sr_cuts)    
         z_bar = value.(price[:z])
         println("z_bar: $(z_bar)")
         println("rcost: $(p_obj + sum(sigma_bar.*z_bar))")    
@@ -581,7 +579,7 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     
     println("fcost: $(p_obj)")
     
-    if !isempty(sr_k)    
+    if !isempty(sr_cuts)    
         for (i, _) in enumerate(sr_cuts)
             println(constraint_by_name(price, "cut_$(i)"))
         end
@@ -661,7 +659,7 @@ function cut_separation_enum(J, lambda_bar, S, triplets, triplets_tracker, max_p
     return violations, cuts_index
 end
 
-function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
+function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
     check_next_lambda = false
 
@@ -699,9 +697,9 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
         # run price lp
         if using_dp
             positive_rcost = Bool[i > 0 for i in pi_bar]
-            p_obj, new_bins = dp_price(J, len_J, pi_bar, sigma_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, sr_k, verbose=verbose, epsilon=epsilon)
+            p_obj, new_bins = dp_price(J, len_J, pi_bar, sigma_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, verbose=verbose, epsilon=epsilon)
         else
-            p_obj, q = price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, verbose=verbose, epsilon=epsilon)
+            p_obj, q = price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, verbose=verbose, epsilon=epsilon)
             new_bins = Vector{Float64}[q]
         end
 
@@ -1166,7 +1164,7 @@ function solve_bpc(
         while continue_adding_cuts # cga and cut adding loop
         # for i in 1:max_checks_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
+            z, cga_lb, S_len = cga(master, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
