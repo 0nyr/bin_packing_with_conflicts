@@ -521,7 +521,7 @@ function first_fit_decreasing_with_conflicts(J, w, W, E, conflicts; verbose=true
 end
 
 "Runs pricing linear programming"
-function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_k, cuts_binary_data; verbose=3, epsilon=1e-4)
+function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_k; verbose=3, epsilon=1e-4)
     # price = Model(Gurobi.Optimizer)
     price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(price)
@@ -605,52 +605,6 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     return p_obj, value.(price[:x])
 end
 
-"Runs relaxed pricing linear programming, but constrains the new bin to be integer"
-function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose=3, epsilon=1e-4)
-    # price = Model(Gurobi.Optimizer)
-    price = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
-    set_silent(price)
-    @variable(price, 1 >= x[1:length(J)] >= 0)
-    # @variable(price, x[1:length(J)], Bin)
-    @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
-    for e in E
-        @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
-    end
-
-    # cut forbidden bags
-    for (i, q) in enumerate(forbidden_bags)
-        @constraint(price, sum([q[j]*x[j] + (1-q[j])*(1-x[j]) for j in J]) <= length(J) - 1, base_name="forbidden_bag_$(i)")
-    end
-    
-    # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
-    @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
-    # set_silent(price)
-
-    # println(LOG_IO, pi_bar)
-    verbose >=3 && println(LOG_IO, price)
-    optimize!(price)
-
-    # is the price feasible?
-    if termination_status(price) != OPTIMAL
-        verbose >= 3 && println(LOG_IO, "price infeasible")
-        return 1, nothing
-    end
-    
-    p_obj = objective_value(price)
-    verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
-        
-    # remove fractional part from new q
-    q = floor_vector(value.(price[:x]), epsilon=epsilon)
-    
-    # after removing the fractional item, is the new q still useful?
-    if !(sum(q) > 2 - epsilon) || q ∈ S 
-        # verbose >= 1 && println(LOG_IO, "Integer pricing empty")
-        return 1, q
-    end
-
-    return p_obj, q
-end
-
 "Searches for subset row cuts by MIP"
 function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4)
         
@@ -706,7 +660,7 @@ function cut_separation_enum(J, lambda_bar, S, w, W, binarized_E, triplets; verb
     end
 end
 
-function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
+function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
     check_next_lambda = false
 
@@ -746,7 +700,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             positive_rcost = Bool[i > 0 for i in pi_bar]
             p_obj, q = dp_price(J, len_J, pi_bar, sigma_bar, positive_rcost, w, binarized_E, W, subset_row_cuts, cuts_binary_data, sr_k, verbose=verbose, epsilon=epsilon)
         else
-            p_obj, q = price_function(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, cuts_binary_data, verbose=verbose, epsilon=epsilon)
+            p_obj, q = price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, subset_row_cuts, sr_k, verbose=verbose, epsilon=epsilon)
         end
 
         println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
@@ -780,16 +734,18 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
 
             if q == S[end]
                 error("repeated bin")
+            elseif q ∈ S
+                error("AHA!")
             end
 
-            # check the value of lambdas added by the cga
-            if check_next_lambda
-                if value(lambdas[end]) < epsilon
-                    error("AHA!")
-                end
-            else
-                check_next_lambda = true
-            end
+            # # check the value of lambdas added by the cga
+            # if check_next_lambda
+            #     if value(lambdas[end]) < epsilon
+            #         error("AHA!")
+            #     end
+            # else
+            #     check_next_lambda = true
+            # end
 
             # add new packing scheme to list
             push!(S, q)
@@ -1221,7 +1177,7 @@ function solve_bpc(
         while continue_adding_cuts # cga and cut adding loop
         # for i in 1:max_cuts_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, price_lp, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=false)
+            z, cga_lb, S_len = cga(master, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=false)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
