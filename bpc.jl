@@ -1182,50 +1182,9 @@ function solve_bpc(
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
     
-        # run column generation with rounded pricing lp (effectively a heuristic)
-        # println(LOG_IO, "column generation with rounded pricing lp")
-        # m_obj, cga_ub, S_len = cga(master, rounded_relaxed_price_lp, w, W, J, translated_E, lambdas, S, S_len, forbidden_bags, verbose=verbose, epsilon=epsilon, max_iter=max_iter)
-        # if termination_status(master) == OPTIMAL
-            
-        #     # get solution values
-        #     lambda_bar = value.(lambdas)
-        #     x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
-        
-        #     # treat current solution
-        #     current_solution = round_up_solution(x_bar)
-        #     current_solution, cga_ub = prune_excess_with_priority(current_solution, J, w, epsilon=epsilon)
-            
-        #     verbose >= 1 && println(LOG_IO, "Rounded CGA upper bound: $(cga_ub + node.mandatory_bag_amount)")
-        
-        #     # was there an improvement from the heuristic?
-        #     if cga_ub + node.mandatory_bag_amount < node.bounds[2]
-        
-        #         node.bounds[2] = cga_ub + node.mandatory_bag_amount
-        #         best_solution = deepcopy(current_solution)
-        #         node.solution = best_solution
-                
-        #         # update bounds status
-        #         update_bounds_status(node, bounds, best_node, nodes, verbose=verbose)
-        #         if node.bounds_status != 0 # is it a global or local optimal?
-        #             if node.bounds_status == 1 # no need to continue
-        #                 # prune the tree
-        #                 continue
-        #             else # global optimal
-        #                 break
-        #                 # return best_solution, bounds[2]
-        #             end
-        #         end  
-        #     end
-        
-        # end
-
-
-
         ## BCPA
 
         # apply cga
-        # if using_dp == false, it will solve by MIP, else will solve by dynamic programming
-        # println(LOG_IO, "column generation with labelling")
         
         # cuts auxiliary data for processing
         J_len = length(J)
@@ -1238,13 +1197,12 @@ function solve_bpc(
 
         # binarized E, for fast conflict checks
         binarized_E = BitVector[falses(J_len) for i in J]
-
         for (i, j) in translated_E
             binarized_E[i][j] = true
             binarized_E[j][i] = true
         end
 
-
+        # cuts control
         max_cuts = length(J)/2
         max_cuts_per_node = 10
         cuts_added_this_node = 0
@@ -1261,11 +1219,6 @@ function solve_bpc(
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
             end
-    
-            # # is there already a better or equal solution?
-            # if cga_lb + node.mandatory_bag_amount >= bounds[2]
-            #     continue # close node
-            # end
     
             if cga_lb + node.mandatory_bag_amount > node.bounds[1]
     
