@@ -127,9 +127,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     new_sr_cuts = Vector{Int64}[]
     for (n, cut_binary) in enumerate(cuts_binary_data)
         if cut_binary[i] && cut_binary[j]
-            if node.subset_row_k[n] > length(node.subset_row_cuts[n]) - 1 
-                continue # the cut is only valid if 1 < k <= |S|
-            end
 
             # update positions and ignore the "new i" (j's new name)
             new_cut = Int64[r > j ? r-1 : r for r in node.subset_row_cuts[n] if r != j]
@@ -152,6 +149,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
             push!(new_sr_cuts, new_cut)
         end
     end
+
+    new_sr_cuts = deepcopy(Vector{Int64}[])
 
     # make child
     # pos_child = deepcopy(node)
