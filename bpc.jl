@@ -85,7 +85,7 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64}, bags_in_use::Vector{Int64}, cuts_binary_data::Vector{BitVector})
+function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64}, bags_in_use::Vector{Int64}, cuts_binary_data::Vector{BitVector}, cuts_in_use)
     
     w = node.w
     W = node.W
@@ -124,7 +124,9 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
 
     # translate cuts considering the merge of i and j
     new_sr_cuts = Vector{Int64}[]
-    for (n, cut_binary) in enumerate(cuts_binary_data)
+    for n in cuts_in_use
+        cut_binary = cuts_binary_data[n]
+
         if cut_binary[i] && cut_binary[j]
 
             # update positions and ignore the "new i" (j's new name)
@@ -223,7 +225,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
-        deepcopy(node.subset_row_cuts),
+        deepcopy(Vector{Int64}[node.subset_row_cuts[n] for n in cuts_in_use]),
         vcat(node.branch_history, Vector{Int64}[[0, i, j]])
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
@@ -1136,7 +1138,6 @@ function solve_bpc(
         max_cuts = 10*length(J)
         max_checks_per_node = 10
         max_cuts_per_check = 10
-        cuts_added_this_node = 0
         checks_done_this_node = 0
 
         triplets = get_triplets(J, w, W, binarized_E)
@@ -1174,7 +1175,7 @@ function solve_bpc(
             end
 
             # if too many cuts already, skip the stop the cut adding loop
-            if cuts_added_this_node >= max_checks_per_node || length(node.subset_row_cuts) >= max_cuts
+            if checks_done_this_node >= max_checks_per_node || length(node.subset_row_cuts) >= max_cuts
                 continue_adding_cuts = false
                 break
             end
@@ -1188,6 +1189,7 @@ function solve_bpc(
             if isempty(new_cuts_index) # no cuts to add
                 break
             end
+                checks_done_this_node += 1
                 for (t_index, v_index) in enumerate(new_cuts_index)
 
                     cut_data = deepcopy(triplets[t_index])
@@ -1209,8 +1211,6 @@ function solve_bpc(
                         cuts_binary_data[end][r] = true
                     end
     
-                    cuts_added_this_node += 1
-                    
                     println(master)
                 end
             end
@@ -1251,8 +1251,17 @@ function solve_bpc(
             println(LOG_IO, "enum_q: $([i for i in enumerate(q)])")
             println(LOG_IO, "j: $(j)")
 
+            # get cuts that are actually in use
+            if isempty(cut_constraints_ref) # trying to get from an empty array will raise error
+                sigma_bar = Float64[]
+            else
+                sigma_bar = dual.(cut_constraints_ref)
+            end
+            cuts_in_use = Int64[k for (k,v) in enumerate(sigma_bar) if v < -epsilon]
+            println("σ_bar = $(sigma_bar)")
+            println("cuts_in_use = $(cuts_in_use)")
 
-            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data)
+            make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data, cuts_in_use)
             node_counter[1] += 2
 
         else # the solution is integer!
