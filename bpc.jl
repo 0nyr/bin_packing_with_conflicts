@@ -1,6 +1,7 @@
 using JuMP
 using Gurobi
 using LinearAlgebra
+using Combinatorics
 
 include("utils.jl")
 include("parallel_pricing.jl")
@@ -648,67 +649,60 @@ function rounded_relaxed_price_lp(pi_bar, w, W, J, E, S, forbidden_bags; verbose
     return p_obj, q
 end
 
-"Searches for subset row cuts"
-function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4, n_min=3, n_max=3)
-    # price = Model(Gurobi.Optimizer)
+"Searches for subset row cuts by MIP"
+function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4)
+        
+    best_x = Float64[0.0 for j in J]
+    n=3
+    k=2
+    
     cut_separator = Model(() -> Gurobi.Optimizer(GUROBI_ENV))
     set_silent(cut_separator)
 
+    # main constraint
     @variable(cut_separator, x[1:length(J)], Bin)    
-    @variable(cut_separator, aux_w[1:length(lambda_bar)] >= 0, Int)
+    @constraint(cut_separator, sum([x[j] for j ∈ J]) == n, base_name="main_constraint")
     
-    main_constraint = @constraint(cut_separator, sum([x[j] for j ∈ J]) == n_min, base_name="main_constraint")
-
+    # auxiliary constraints
     aux_constraints = ConstraintRef[]
+    @variable(cut_separator, aux_w[1:length(lambda_bar)] >= 0, Int)
     for (p, l) in enumerate(lambda_bar)
-        # new_const = @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
-        new_const = @constraint(cut_separator, sum([x[j] for j ∈ J]) + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
+        new_const = @constraint(cut_separator, sum([S[p][j]*x[j] for j ∈ J])/k + epsilon >= aux_w[p], base_name="aux_constraint_$(p)")
         push!(aux_constraints, new_const)
     end
     
-    best_x = Float64[0.0 for j in J]
-    best_obj = -Inf
-    k=2
-    for n in n_min:n_max
-
-        set_normalized_rhs(main_constraint, n)
-
-        # for k in 2:n
-        for k in 2:2
-        
-            for (p, l) in enumerate(lambda_bar)
-                for j in J
-                    set_normalized_coefficient(aux_constraints[p], x[j], S[p][j]/k)
-                end
-            end
-
-            @objective(cut_separator, Max, sum([aux_w[p]*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
-            verbose >=4 && println(LOG_IO, cut_separator)
-            optimize!(cut_separator)
+    @objective(cut_separator, Max, sum([aux_w[p]*l  for (p, l) in enumerate(lambda_bar)]) - floor(n/k) )
     
-            obj = objective_value(cut_separator)
-            x_bar = value.(cut_separator[:x])
-            
-            if obj > 0
-                if obj > best_obj
-                    best_x = x_bar
-                    best_obj = obj
-                end
-            end
-        end
+    verbose >=4 && println(LOG_IO, cut_separator)
+    optimize!(cut_separator)
+
+    obj = objective_value(cut_separator)
+    
+    if obj > 0
+        best_x = value.(cut_separator[:x])
     end
-
-    # if !(print_once[1])
-    #     println(LOG_IO, price)
-    #     print_once[1] = true
-    # end
-    # println(LOG_IO, price)
-    
-    # verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
-        
-    return best_obj, k, Int64[i for (i, val) in enumerate(best_x) if val > .5]
+ 
+    return obj, k, Int64[i for (i, val) in enumerate(best_x) if val > .5]
 end
 
+
+get_triplets(J, w, W, binarized_E) = filter((x) -> w[x[1]] + w[x[2]] + w[x[3]] < W && !binarized_E[x[1]][x[2]] && !binarized_E[x[1]][x[3]] && !binarized_E[x[2]][x[3]] , combinations(J, 3))
+
+"Searches for subset row cuts by enumeration"
+function cut_separation_enum(J, lambda_bar, S, w, W, binarized_E, triplets; verbose=3, epsilon=1e-4)
+    
+    cuts = Vector{Int64}[]
+    violations = Float64[]
+    
+    for triplet_i in triplets   
+        violation = sum(floor(sum(Float64[S[q][j] for j in triplet_i])/2)*l for (q, l) in enumerate(lambda_bar)) - 1
+
+        if violation > 0
+            push!(violations, violation)
+            push!(cuts, triplet_i)
+        end
+    end
+end
 
 function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
