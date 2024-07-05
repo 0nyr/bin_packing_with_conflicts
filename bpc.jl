@@ -167,8 +167,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        # deepcopy(new_S), # S
-        Vector{Float64}[],
+        deepcopy(new_S), # S
+        # Vector{Float64}[],
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -201,6 +201,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     end
 
     filter!((x) -> !any(Bool[binarized_pos_child_E[i][k] for (k, val) in enumerate(x) if val > .5]), pos_child.S)
+    # unique!(pos_child.S)
 
 
 
@@ -210,8 +211,9 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
     # pass important bags to child, while removing bags that violate the new conflict
-    # new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
-    new_S = Vector{Float64}[]
+    new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
+    # new_S = unique(Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5])
+    # new_S = Vector{Float64}[]
 
     # split branch
     # neg_child = deepcopy(node)
@@ -706,6 +708,8 @@ end
 
 function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
     
+    check_next_lambda = false
+
     len_J = length(J)
 
     m_obj = Inf
@@ -774,9 +778,18 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
 
 
-            # if q == S[end]
-            #     error("repeated bin")
-            # end
+            if q == S[end]
+                error("repeated bin")
+            end
+
+            # check the value of lambdas added by the cga
+            if check_next_lambda
+                if value(lambdas[end]) < epsilon
+                    error("AHA!")
+                end
+            else
+                check_next_lambda = true
+            end
 
             # add new packing scheme to list
             push!(S, q)
