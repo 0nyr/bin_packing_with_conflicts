@@ -23,7 +23,6 @@ mutable struct Node
     mandatory_bag_amount::Int64
     forbidden_bags::Vector{Vector{Int64}} # forbidden q ∈ S
     item_address::Vector{Int64}
-    interval_graph::Bool # can DP-flow be used? 
     bounds::Vector{Int64} # [lower_bound, upper_bound]
     solution::Vector{Vector{Int64}}
     bounds_status::Int64 # 0: not optimal, 1: locally optimized, 2: globally optimized 
@@ -147,8 +146,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         end
     end
 
-    new_sr_cuts = deepcopy(Vector{Int64}[])
-
     # make child
     # pos_child = deepcopy(node)
     # node_counter[1] += 1
@@ -166,7 +163,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
         deepcopy(node.item_address),
-        false, # interval_graph
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
@@ -224,7 +220,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
         deepcopy(node.item_address),
-        false, # interval_graph
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
@@ -347,7 +342,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         deepcopy(node.mandatory_bag_amount) + 1, # add the new mandatory bag
         deepcopy(node.forbidden_bags),
         deepcopy(node.item_address),
-        false, # interval_graph
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
@@ -381,7 +375,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
         deepcopy(node.item_address),
-        false, # interval_graph
         deepcopy(node.bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
@@ -874,7 +867,6 @@ function solve_bpc(
         0, # mandatory_bag_amount
         Vector{Int64}[], # forbidden_bags
         Int64[j for j in J], # item_address
-        false, # interval_graph
         deepcopy(bounds), # node bounds
         Vector{Int64}[], # solution
         0, # bounds_status
