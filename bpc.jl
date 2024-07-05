@@ -1059,14 +1059,18 @@ function solve_bpc(
                     end   
                 end
 
-                initial_solution = deepcopy(ffd_solution)    
+                initial_solution = deepcopy(ffd_solution)
             end
+        else
+            ffd_solution_is_good = false 
         end
     
-        if run_ffd && !(ffd_solution_is_good) && naive_solution_is_good
-            initial_solution = deepcopy(naive_solution)
-        else # no solution
-            initial_solution = Vector{Int64}[]
+        if !(ffd_solution_is_good)
+            if naive_solution_is_good
+                initial_solution = deepcopy(naive_solution)
+            else # no solution
+                initial_solution = Vector{Int64}[]     
+            end
         end
         
         # try to improve lower bound with martello L2 lower bound
@@ -1102,28 +1106,28 @@ function solve_bpc(
         #  set_time_limit_sec(master, 600)
         set_silent(master)
         
-        # add the naive solution as lambda variables
-        # S = deepcopy(node.S)
-        for q in naive_solution
-            if !(q ∈ S) # pass the relevant bags to S
-                push!(S, q)
-            end
-        end
-
-        # if FFD was ran pass the relevant bags to S
-        if run_ffd
-            for q in ffd_solution
-                if sum(q) > 1.0 && !(q ∈ S) # pass the relevant bags to S
-                    push!(S, q)
-                end
-            end
-        end
-
-        # for q in best_solution
-        #     if !(q ∈ S)
+        # # add the naive solution as lambda variables
+        # # S = deepcopy(node.S)
+        # for q in naive_solution
+        #     if !(q ∈ S) # pass the relevant bags to S
         #         push!(S, q)
         #     end
         # end
+
+        # # if FFD was ran pass the relevant bags to S
+        # if run_ffd
+        #     for q in ffd_solution
+        #         if sum(q) > 1.0 && !(q ∈ S) # pass the relevant bags to S
+        #             push!(S, q)
+        #         end
+        #     end
+        # end
+
+        for q in best_solution
+            if !(q ∈ S)
+                push!(S, q)
+            end
+        end
 
         node.S = S
         S_len = length(S)
@@ -1145,8 +1149,13 @@ function solve_bpc(
             # push!(artificial_variables, au, al)
             # push!(demand_constraints_ref, con_ref)
 
-            con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
-            push!(demand_constraints_ref, con_ref)            
+            # con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
+            # push!(demand_constraints_ref, con_ref)  
+            
+            av = @variable(master, lower_bound=0, base_name="av_$(i)")
+            con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + av >= 1, base_name="demand_$(i)")
+            push!(demand_constraints_ref, con_ref)  
+            push!(artificial_variables, av)
         end
 
         # subset_row_cuts (Jepsen, 2008)
@@ -1166,9 +1175,9 @@ function solve_bpc(
     
         # objective function
         # @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables) + 10000*item_amount*sum(cut_artificial_variables))
-        # @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables))
-        @objective(master, Min, sum(lambdas))
-    
+        @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables))
+        # @objective(master, Min, sum(lambdas))
+
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
     
