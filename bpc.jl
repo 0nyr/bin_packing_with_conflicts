@@ -628,23 +628,32 @@ end
 get_triplets(J, w, W, binarized_E) = filter((x) -> w[x[1]] + w[x[2]] + w[x[3]] < W && !binarized_E[x[1]][x[2]] && !binarized_E[x[1]][x[3]] && !binarized_E[x[2]][x[3]], collect(combinations(J, 3)))
 
 "Searches for subset row cuts by enumeration"
-function cut_separation_enum(J, lambda_bar, S, triplets; verbose=3, epsilon=1e-4)
-    
-    cuts = Vector{Int64}[]
+function cut_separation_enum(J, lambda_bar, S, triplets, triplets_tracker, max_per_check; verbose=3, epsilon=1e-4)
+
+    cuts_index = Vector{Int64}[]
     violations = Float64[]
     
-    for triplet_i in triplets   
+    for (i, triplet_i) in enumerate(triplets)
+
+        # cut already added to master
+        if triplets_tracker[i]
+            continue
+        end
+
         violation = sum(floor(sum(Float64[S[q][j] for j in triplet_i])/2)*l for (q, l) in enumerate(lambda_bar)) - 1
 
         if violation > epsilon
             push!(violations, violation)
-            push!(cuts, triplet_i)
+            push!(cuts_index, Int64[i, length(violations)])
+            triplets_tracker[i] = true
         end
     end
-    # return violations, cuts
-    max_violation, array_pos = findmax(violations)
 
-    return max_violation, 2, cuts[array_pos]
+    if length(cuts_index) > max_per_check
+        cuts_index = sort(cuts_index, by=(x) -> -violations[x[2]])[1:max_per_check]
+    end
+
+    return violations, cuts_index
 end
 
 function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
@@ -718,7 +727,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
             for q in new_bins
 
                 # price
-                verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
+                verbose >= 4 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
 
 
                 if q == S[end]
@@ -762,12 +771,12 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
 
             end
 
-            println("objective_function: $(objective_function(master))")
-            if !isempty(cut_constraints_ref)
-                println("cut: $(subset_row_cuts[end])")
-                println("cut constraint: $(cut_constraints_ref[end])")
-            end
-            println("\n\n")
+            # println("objective_function: $(objective_function(master))")
+            # if !isempty(cut_constraints_ref)
+            #     println("cut: $(subset_row_cuts[end])")
+            #     println("cut constraint: $(cut_constraints_ref[end])")
+            # end
+            # println("\n\n")
 
 
             # show updated master
@@ -1056,23 +1065,6 @@ function solve_bpc(
         #  set_time_limit_sec(master, 600)
         set_silent(master)
         
-        # # add the naive solution as lambda variables
-        # # S = deepcopy(node.S)
-        # for q in naive_solution
-        #     if !(q ∈ S) # pass the relevant bags to S
-        #         push!(S, q)
-        #     end
-        # end
-
-        # # if FFD was ran pass the relevant bags to S
-        # if run_ffd
-        #     for q in ffd_solution
-        #         if sum(q) > 1.0 && !(q ∈ S) # pass the relevant bags to S
-        #             push!(S, q)
-        #         end
-        #     end
-        # end
-
         for q in best_solution
             if !(q ∈ S)
                 push!(S, q)
@@ -1095,16 +1087,7 @@ function solve_bpc(
         # demand constraints and artificial variables
         artificial_variables = VariableRef[]
         demand_constraints_ref = ConstraintRef[]
-        for i in J
-            # au = @variable(master, lower_bound=0, base_name="a_u_$(i)")
-            # al = @variable(master, lower_bound=0, base_name="a_l_$(i)")
-            # con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + au - al == 1, base_name="demand_$(i)")
-            # push!(artificial_variables, au, al)
-            # push!(demand_constraints_ref, con_ref)
-
-            # con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) >= 1, base_name="demand_$(i)")
-            # push!(demand_constraints_ref, con_ref)  
-            
+        for i in J            
             av = @variable(master, lower_bound=0, base_name="av_$(i)")
             con_ref = @constraint(master, sum([sum(S[q][i]*lambdas[q]) for q in 1:S_len]) + av >= 1, base_name="demand_$(i)")
             push!(demand_constraints_ref, con_ref)  
@@ -1115,21 +1098,16 @@ function solve_bpc(
         cut_artificial_variables = VariableRef[]
         cut_constraints_ref = ConstraintRef[]
         for (n, cut_n) in enumerate(node.subset_row_cuts)
-            # av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
             k = node.subset_row_k[n]
             row_subset = cut_n
 
-            # con_ref = @constraint(master, -av_cut + sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
             con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
             
-            # push!(cut_artificial_variables, av_cut)
             push!(cut_constraints_ref, con_ref)
         end
     
         # objective function
-        # @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables) + 10000*item_amount*sum(cut_artificial_variables))
         @objective(master, Min, sum(lambdas) + 10000*item_amount*sum(artificial_variables))
-        # @objective(master, Min, sum(lambdas))
 
         # show initial master
         verbose >= 2 && println(LOG_IO, master)
@@ -1155,18 +1133,22 @@ function solve_bpc(
         end
 
         # cuts control
-        max_cuts = length(J)/2
-        max_cuts_per_node = 10
+        max_cuts = 10*length(J)
+        max_checks_per_node = 10
+        max_cuts_per_check = 10
         cuts_added_this_node = 0
+        checks_done_this_node = 0
 
         triplets = get_triplets(J, w, W, binarized_E)
+        triplets_tracker = falses(length(triplets))
+
         
         lambda_bar = Float64[]
         z, cga_lb = Inf, Inf
         cga_lb_break = false
         continue_adding_cuts = true
         while continue_adding_cuts # cga and cut adding loop
-        # for i in 1:max_cuts_per_node # cga and cut adding loop
+        # for i in 1:max_checks_per_node # cga and cut adding loop
             
             z, cga_lb, S_len = cga(master, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
             if termination_status(master) != OPTIMAL
@@ -1192,7 +1174,7 @@ function solve_bpc(
             end
 
             # if too many cuts already, skip the stop the cut adding loop
-            if cuts_added_this_node >= max_cuts_per_node || length(node.subset_row_cuts) >= max_cuts
+            if cuts_added_this_node >= max_checks_per_node || length(node.subset_row_cuts) >= max_cuts
                 continue_adding_cuts = false
                 break
             end
@@ -1202,40 +1184,35 @@ function solve_bpc(
 
             # try to find subset row cuts
             # violation, k, cut_data = cut_separation(J, lambda_bar, S)
-            violation, k, cut_data = cut_separation_enum(J, lambda_bar, S, triplets)
-            if violation > epsilon
-                println(LOG_IO, "adding cut with k = $(k), violation = $(violation): $(cut_data)")
-
-
-                # add cut data to node
-                push!(node.subset_row_cuts, cut_data)
-                push!(node.subset_row_k, k)
-                n = length(node.subset_row_cuts)
-                
-                # add cut to master
-                # av_cut = @variable(master, lower_bound=0, base_name="av_cut_$(n)")
-                # push!(cut_artificial_variables, av_cut)
-                
-                # con_ref = @constraint(master, -av_cut + sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
-                con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
-
-                # set_objective_function(master, objective_function(master) + 10000*item_amount*av_cut)
-
-                # add to constraint to reference array
-                push!(cut_constraints_ref, con_ref)
-
-                # update auxiliary cut data
-                push!(cuts_binary_data, falses(J_len))
-                for r in cut_data
-                    cuts_binary_data[end][r] = true
-                end
-
-                cuts_added_this_node += 1
-                
-                println(master)
-
-            else
+            violations, new_cuts_index = cut_separation_enum(J, lambda_bar, S, triplets, triplets_tracker, max_cuts_per_check)
+            if isempty(new_cuts_index) # no cuts to add
                 break
+            end
+                for (t_index, v_index) in enumerate(new_cuts_index)
+
+                    cut_data = deepcopy(triplets[t_index])
+                    println(LOG_IO, "adding cut with violation = $(violations[v_index]): $(cut_data)")
+    
+                    # add cut data to node
+                    push!(node.subset_row_cuts, cut_data)
+                    n = length(node.subset_row_cuts)
+                    
+                    # add cut to master
+                    con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
+    
+                    # add to constraint to reference array
+                    push!(cut_constraints_ref, con_ref)
+    
+                    # update auxiliary cut data
+                    push!(cuts_binary_data, falses(J_len))
+                    for r in cut_data
+                        cuts_binary_data[end][r] = true
+                    end
+    
+                    cuts_added_this_node += 1
+                    
+                    println(master)
+                end
             end
         end
 

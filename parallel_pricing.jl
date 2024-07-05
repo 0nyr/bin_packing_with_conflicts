@@ -232,16 +232,16 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
             error("label $(best_label) is too heavy: $(best_label.weight)")
         end
     
-        println("best new bin:")
-        println("sigma: $(sigma)")
-        println("m: $(best_label.m)")
-        println("k: $(sr_k)")
-        println("rcost: $(best_label.rcost)")
-        println("fcost: $(best_label.fcost[1])")
+        # println("best new bin:")
+        # println("sigma: $(sigma)")
+        # println("m: $(best_label.m)")
+        # println("k: $(sr_k)")
+        # println("rcost: $(best_label.rcost)")
+        # println("fcost: $(best_label.fcost[1])")
         
         println("found $(length(good_labels)) bins")
         
-        println("")    
+        # println("")    
     end
 
 
