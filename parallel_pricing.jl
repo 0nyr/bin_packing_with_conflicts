@@ -9,7 +9,6 @@ struct Label
     conflicts::BitVector # conflics that will be found by moving forward
     m::Vector{Int64} # amount of custumers involved in cut i for i in cuts: |S_i ∩ V(L)|
     sigma_ref::Vector{Float64} # necessary for dominance criteria...
-    k_ref::Vector{Int64} # necessary for dominance criteria...
 end
 
 # auxiliary stuff
@@ -35,9 +34,9 @@ function Base.isless(l1::Label, l2::Label)
                     
                     for (q, is_negative) in enumerate(negative_sigma) # start by checking sigma, most likely positive 
                         if is_negative
-                            sr_k = l1.k_ref
+
                             # tau_l1 > tau_l2 ?
-                            if l1.m[q] % sr_k[q] > l2.m[q] % sr_k[q] 
+                            if l1.m[q] % 2 > l2.m[q] % 2 
                                 sum_sigma_q_in_Q += l1.sigma_ref[q]     
                             end
                         end
@@ -67,7 +66,7 @@ end
 
 "Updates the label final cost (the reduced cost considering cut violations)"
 function update_fcost(label::Label)
-    label.fcost[1] = label.rcost - sum(label.sigma_ref.*floor.(label.m ./ label.k_ref))
+    label.fcost[1] = label.rcost - sum(label.sigma_ref.*floor.(label.m / 2))
 end
 
 "Dynamic programming (labelling) price"
@@ -88,7 +87,7 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
         # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-        label = Label(1-rc[i], Float64[0.0], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma, sr_k)
+        label = Label(1-rc[i], Float64[0.0], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma)
         label.items[i] = true
         update_m(label, i, cuts_binary_data)
         update_fcost(label)
@@ -152,7 +151,6 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
                 # curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
                 deepcopy(curr_label.m),
                 sigma,
-                sr_k,
             )
 
             new_label.items[i] = true

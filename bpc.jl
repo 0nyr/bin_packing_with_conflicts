@@ -642,10 +642,10 @@ function cut_separation(J, lambda_bar, S; verbose=3, epsilon=1e-4)
 end
 
 
-get_triplets(J, w, W, binarized_E) = filter((x) -> w[x[1]] + w[x[2]] + w[x[3]] < W && !binarized_E[x[1]][x[2]] && !binarized_E[x[1]][x[3]] && !binarized_E[x[2]][x[3]] , combinations(J, 3))
+get_triplets(J, w, W, binarized_E) = filter((x) -> w[x[1]] + w[x[2]] + w[x[3]] < W && !binarized_E[x[1]][x[2]] && !binarized_E[x[1]][x[3]] && !binarized_E[x[2]][x[3]], collect(combinations(J, 3)))
 
 "Searches for subset row cuts by enumeration"
-function cut_separation_enum(J, lambda_bar, S, w, W, binarized_E, triplets; verbose=3, epsilon=1e-4)
+function cut_separation_enum(J, lambda_bar, S, triplets; verbose=3, epsilon=1e-4)
     
     cuts = Vector{Int64}[]
     violations = Float64[]
@@ -653,11 +653,15 @@ function cut_separation_enum(J, lambda_bar, S, w, W, binarized_E, triplets; verb
     for triplet_i in triplets   
         violation = sum(floor(sum(Float64[S[q][j] for j in triplet_i])/2)*l for (q, l) in enumerate(lambda_bar)) - 1
 
-        if violation > 0
+        if violation > epsilon
             push!(violations, violation)
             push!(cuts, triplet_i)
         end
     end
+    # return violations, cuts
+    max_violation, array_pos = findmax(violations)
+
+    return max_violation, 2, cuts[array_pos]
 end
 
 function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, sr_k, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
@@ -1095,7 +1099,10 @@ function solve_bpc(
 
         node.S = S
         S_len = length(S)
-    
+        # if S_len != length(unique(S))
+        #     error("AHA")
+        # end
+            
         # create lambda variables from existing q ∈ S
         lambdas = VariableRef[]
         for (i, q) in enumerate(S) 
@@ -1169,6 +1176,8 @@ function solve_bpc(
         max_cuts = length(J)/2
         max_cuts_per_node = 10
         cuts_added_this_node = 0
+
+        triplets = get_triplets(J, w, W, binarized_E)
         
         lambda_bar = Float64[]
         z, cga_lb = Inf, Inf
@@ -1177,7 +1186,7 @@ function solve_bpc(
         while continue_adding_cuts # cga and cut adding loop
         # for i in 1:max_cuts_per_node # cga and cut adding loop
             
-            z, cga_lb, S_len = cga(master, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=false)
+            z, cga_lb, S_len = cga(master, w, W, J, translated_E, lambdas, node.S, S_len, forbidden_bags, node.subset_row_cuts, cuts_binary_data, node.subset_row_k, demand_constraints_ref, cut_constraints_ref, binarized_E, verbose=verbose, epsilon=epsilon, max_iter=max_iter, using_dp=true)
             if termination_status(master) != OPTIMAL
                 println(LOG_IO, "node $(node.id) linear programming failed to optimize")
                 break
@@ -1210,9 +1219,10 @@ function solve_bpc(
             lambda_bar = value.(lambdas)
 
             # try to find subset row cuts
-            violation, k, cut_data = cut_separation(J, lambda_bar, S)
-            if violation > 0
-                println(LOG_IO, "adding cut with k = $(k): $(cut_data)")
+            # violation, k, cut_data = cut_separation(J, lambda_bar, S)
+            violation, k, cut_data = cut_separation_enum(J, lambda_bar, S, triplets)
+            if violation > epsilon
+                println(LOG_IO, "adding cut with k = $(k), violation = $(violation): $(cut_data)")
 
 
                 # add cut data to node
