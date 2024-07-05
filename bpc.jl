@@ -524,21 +524,37 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     
     # @variable(price, 1 >= x[1:length(J)] >= 0)
     @variable(price, x[1:length(J)], Bin)
+    
     @constraint(price, sum([w[j]*x[j] for j ∈ J]) <= W, base_name="capacity")
     for e in E
         @constraint(price, x[e[1]] + x[e[2]] <= 1, base_name="e_($(e[1]), $(e[2]))")
     end
-
+    
     # cut forbidden bags
     for (i, q) in enumerate(forbidden_bags)
         @constraint(price, sum([q[j]*x[j] + (1-q[j])*(1-x[j]) for j in J]) <= length(J) - 1, base_name="forbidden_bag_$(i)")
     end
+    
+
+    # Subset row cuts?
+    if !isempty(sr_k)
+        
+        # Subset row cuts!
+        @variable(price, z[1:length(sr_k)] >= 0, Int)
+        for (i, cut) in enumerate(sr_cuts)
+            a = 1/sr_k[i]
+            @constraint(price, z[i] >= sum([a*x[j] for j in cut]) - 1, base_name="cut_$(i)")
+        end
+
+        @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]) - sum([sigma_i*z[i] for (i, sigma_i) in enumerate(sigma_bar)]))
+
+    else
+        
+        # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
+        @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
+    end
 
     
-    # @objective(price, Min, sum([(1- pi_bar[j])*x[j] for j ∈ J]))
-    @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]))
-    # set_silent(price)
-
     # println(LOG_IO, pi_bar)
     verbose >=3 && println(LOG_IO, price)
     # if !(print_once[1])
@@ -558,12 +574,27 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
     verbose >=2 && println(LOG_IO, "̄c = $(p_obj)")
 
     new_x_bar = value.(price[:x])
-
+    
     println("sigma: $(sigma_bar)")
     println("m: $(Int64[ length(Int64[j for j in cut if new_x_bar[j] > 0.5]) for cut in sr_cuts ])")
     println("k: $(sr_k)")
-    println("rcost: $(p_obj)")
+    
+    if !isempty(sr_k)    
+        z_bar = value.(price[:z])
+        println("z_bar: $(z_bar)")
+        println("rcost: $(p_obj + sum(sigma_bar.*z_bar))")    
+    else
+        println("rcost: $(p_obj)")
+    end
+    
     println("fcost: $(p_obj)")
+    
+    if !isempty(sr_k)    
+        for (i, _) in enumerate(sr_cuts)
+            println(constraint_by_name(price, "cut_$(i)"))
+        end
+    end
+
     println("")
 
         
@@ -720,6 +751,7 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
         end
 
         println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
+        println("largest lambda: $(max(value.(lambdas)...))")
         println("p_obj: $(p_obj)")
 
 
@@ -1086,6 +1118,13 @@ function solve_bpc(
                 end
             end
         end
+
+        # for q in best_solution
+        #     if !(q ∈ S)
+        #         push!(S, q)
+        #     end
+        # end
+
         node.S = S
         S_len = length(S)
     
