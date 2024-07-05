@@ -543,7 +543,7 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts, sr_
         @variable(price, z[1:length(sr_k)] >= 0, Int)
         for (i, cut) in enumerate(sr_cuts)
             a = 1/sr_k[i]
-            @constraint(price, z[i] >= sum([a*x[j] for j in cut]) - 1, base_name="cut_$(i)")
+            @constraint(price, z[i] >= sum([a*x[j] for j in cut]) - 1 + 1e-3, base_name="cut_$(i)")
         end
 
         @objective(price, Min, 1- sum([pi_bar[j]*x[j] for j ∈ J]) - sum([sigma_i*z[i] for (i, sigma_i) in enumerate(sigma_bar)]))
