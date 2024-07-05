@@ -45,6 +45,7 @@ function Base.isless(l1::Label, l2::Label)
                 end
             end
             return l1.fcost[1] - sum_sigma_q_in_Q <= l2.fcost[1]
+            # return l1.rcost - sum_sigma_q_in_Q <= l2.rcost
             # return l1.fcost[1] <= l2.fcost[1]
         else
             return false
