@@ -166,7 +166,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         deepcopy(node.E),
         deepcopy(node.w),
         deepcopy(node.W),
-        deepcopy(new_S), # S
+        # deepcopy(new_S), # S
+        Vector{Float64}[],
         deepcopy(node.mandatory_bags),
         deepcopy(node.mandatory_bag_amount),
         deepcopy(node.forbidden_bags),
@@ -208,8 +209,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
     # pass important bags to child, while removing bags that violate the new conflict
-    new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
-    # new_S = Vector{Float64}[]
+    # new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
+    new_S = Vector{Float64}[]
 
     # split branch
     # neg_child = deepcopy(node)
@@ -779,9 +780,9 @@ function cga(master, price_function, w, W, J, E, lambdas, S, S_len, forbidden_ba
             verbose >= 1 && println(LOG_IO, "p_obj: $(p_obj), adding lambda $(S_len+1): $(Int64[n for (n, v) in enumerate(q) if v > .5])")
 
 
-            if q == S[end]
-                error("repeated bin")
-            end
+            # if q == S[end]
+            #     error("repeated bin")
+            # end
 
             # add new packing scheme to list
             push!(S, q)
