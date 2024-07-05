@@ -565,19 +565,19 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts; ver
 
     new_x_bar = value.(price[:x])
     
-    println("best new bin:")
-    println("sigma: $(sigma_bar)")
-    println("m: $(Int64[ length(Int64[j for j in cut if new_x_bar[j] > 0.5]) for cut in sr_cuts ])")
+    # println("best new bin:")
+    # println("sigma: $(sigma_bar)")
+    # println("m: $(Int64[ length(Int64[j for j in cut if new_x_bar[j] > 0.5]) for cut in sr_cuts ])")
     
     if !isempty(sr_cuts)    
         z_bar = value.(price[:z])
-        println("z_bar: $(z_bar)")
-        println("rcost: $(p_obj + sum(sigma_bar.*z_bar))")    
+        # println("z_bar: $(z_bar)")
+        # println("rcost: $(p_obj + sum(sigma_bar.*z_bar))")    
     else
-        println("rcost: $(p_obj)")
+        # println("rcost: $(p_obj)")
     end
     
-    println("fcost: $(p_obj)")
+    # println("fcost: $(p_obj)")
     
     if !isempty(sr_cuts)    
         for (i, _) in enumerate(sr_cuts)
@@ -585,7 +585,7 @@ function price_lp(pi_bar, sigma_bar, w, W, J, E, S, forbidden_bags, sr_cuts; ver
         end
     end
 
-    println("")
+    # println("")
 
         
     return p_obj, value.(price[:x])
@@ -682,7 +682,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
 
         # get values to build price
         m_obj = objective_value(master)
-        println("m_obj: $(m_obj)")
+        # println("m_obj: $(m_obj)")
 
         pi_bar = dual.(demand_constraints_ref)
         if isempty(cut_constraints_ref) # trying to get from an empty array will raise error
@@ -703,9 +703,9 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
             new_bins = Vector{Float64}[q]
         end
 
-        println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
-        println("largest lambda: $(max(value.(lambdas)...))")
-        println("p_obj: $(p_obj)")
+        # println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
+        # println("largest lambda: $(max(value.(lambdas)...))")
+        # println("p_obj: $(p_obj)")
 
 
         if p_obj < -epsilon
@@ -1202,7 +1202,7 @@ function solve_bpc(
                 for (t_index, v_index) in new_cuts_index
 
                     cut_data = deepcopy(triplets[t_index])
-                    println(LOG_IO, "adding cut with violation = $(violations[v_index]): $(cut_data)")
+                    # println(LOG_IO, "adding cut with violation = $(violations[v_index]): $(cut_data)")
     
                     # add cut data to node
                     push!(node.subset_row_cuts, cut_data)
@@ -1267,8 +1267,8 @@ function solve_bpc(
                 sigma_bar = dual.(cut_constraints_ref)
             end
             cuts_in_use = Int64[k for (k,v) in enumerate(sigma_bar) if v < -epsilon]
-            println("sigma_bar = $(sigma_bar)")
-            println("cuts_in_use = $(cuts_in_use)")
+            # println("sigma_bar = $(sigma_bar)")
+            # println("cuts_in_use = $(cuts_in_use)")
 
             make_child_node_with_rf_branch(node, j, q, original_w, nodes, node_counter, bags_in_use, cuts_binary_data, cuts_in_use)
             node_counter[1] += 2
@@ -1282,8 +1282,8 @@ function solve_bpc(
             x_bar, cga_ub = get_x(lambda_bar, S, S_len, J, epsilon=epsilon)
             
             
-            println("x_bar_unbin = $(Vector{Int64}[Int64[k for (k,v) in enumerate(bin) if v > 0.5] for bin in x_bar])")
-            println("x_bar_values = $(Vector{Vector{Float64}}[Vector{Float64}[Float64[k,v] for (k,v) in enumerate(bin) if v > 0] for bin in x_bar])")
+            # println("x_bar_unbin = $(Vector{Int64}[Int64[k for (k,v) in enumerate(bin) if v > 0.5] for bin in x_bar])")
+            # println("x_bar_values = $(Vector{Vector{Float64}}[Vector{Float64}[Float64[k,v] for (k,v) in enumerate(bin) if v > 0] for bin in x_bar])")
         
             # treat current solution
             current_solution = round_up_solution(x_bar)
