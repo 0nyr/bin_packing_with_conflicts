@@ -1113,11 +1113,7 @@ function solve_bpc(
         cut_artificial_variables = VariableRef[]
         cut_constraints_ref = ConstraintRef[]
         for (n, cut_n) in enumerate(node.subset_row_cuts)
-            k = node.subset_row_k[n]
-            row_subset = cut_n
-
-            con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in row_subset])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(row_subset)/k), base_name="sr_cut_$(n)")
-            
+            con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_n])/2)*l_p for (p, l_p) in enumerate(lambdas)]) <= 1, base_name="sr_cut_$(n)")
             push!(cut_constraints_ref, con_ref)
         end
     
@@ -1203,7 +1199,7 @@ function solve_bpc(
                 break
             else
                 checks_done_this_node += 1
-                for (t_index, v_index) in enumerate(new_cuts_index)
+                for (t_index, v_index) in new_cuts_index
 
                     cut_data = deepcopy(triplets[t_index])
                     println(LOG_IO, "adding cut with violation = $(violations[v_index]): $(cut_data)")
@@ -1213,7 +1209,7 @@ function solve_bpc(
                     n = length(node.subset_row_cuts)
                     
                     # add cut to master
-                    con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/k)*l_p for (p, l_p) in enumerate(lambdas)]) <= floor(length(cut_data)/k), base_name="sr_cut_$(n)")
+                    con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/2)*l_p for (p, l_p) in enumerate(lambdas)]) <= 1, base_name="sr_cut_$(n)")
     
                     # add to constraint to reference array
                     push!(cut_constraints_ref, con_ref)
