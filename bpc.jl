@@ -28,7 +28,6 @@ mutable struct Node
     solution::Vector{Vector{Int64}}
     bounds_status::Int64 # 0: not optimal, 1: locally optimized, 2: globally optimized 
     subset_row_cuts::Vector{Vector{Int64}} # cut_i for i in cuts | cut_i = [Si_1, Si_2 ... Si_n] 
-    subset_row_k::Vector{Int64} # k_i for i in cuts
     branch_history::Vector{Vector{Int64}} # (is_merge, i, j) for each branch
 end
 
@@ -126,7 +125,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
 
     # translate cuts considering the merge of i and j
     new_sr_cuts = Vector{Int64}[]
-    new_k = Int64[]
     for (n, cut_binary) in enumerate(cuts_binary_data)
         if cut_binary[i] && cut_binary[j]
             if node.subset_row_k[n] > length(node.subset_row_cuts[n]) - 1 
@@ -152,7 +150,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
             continue
         else # add translated cut
             push!(new_sr_cuts, new_cut)
-            push!(new_k, node.subset_row_k[n])
         end
     end
 
@@ -178,7 +175,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         Vector{Int64}[], # solution
         0, # bounds_status
         new_sr_cuts,
-        new_k,
         vcat(node.branch_history, Vector{Int64}[[1, i, j]])
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
@@ -201,7 +197,7 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     end
 
     filter!((x) -> !any(Bool[binarized_pos_child_E[i][k] for (k, val) in enumerate(x) if val > .5]), pos_child.S)
-    # unique!(pos_child.S)
+    unique!(pos_child.S)
 
 
 
@@ -211,8 +207,8 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
     println(LOG_IO, "added node $(pos_child.id) to list")            
 
     # pass important bags to child, while removing bags that violate the new conflict
-    new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
-    # new_S = unique(Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5])
+    # new_S = Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5]
+    new_S = unique(Vector{Float64}[deepcopy(node.S[q]) for q in bags_in_use if node.S[q][i] < .5 || node.S[q][j] < .5])
     # new_S = Vector{Float64}[]
 
     # split branch
@@ -237,7 +233,6 @@ function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64}
         Vector{Int64}[], # solution
         0, # bounds_status
         deepcopy(node.subset_row_cuts),
-        deepcopy(node.subset_row_k),
         vcat(node.branch_history, Vector{Int64}[[0, i, j]])
     )
     neg_child.bounds[2] = neg_child.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
@@ -361,7 +356,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
-        Int64[],
         vcat(node.branch_history, Vector{Int64}[[0, i, j]]),
     )
     pos_child.bounds[2] = pos_child.mandatory_bag_amount + length(node.J)-length(q) + 1 # remove prior upper bound
@@ -396,7 +390,6 @@ function make_child_node_with_bag_branch(node::Node, q::Vector{Float64}, origina
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
-        Int64[],
         vcat(node.branch_history, Vector{Int64}[[0, i, j]]),
     )
     neg_child.bounds[2] = node.mandatory_bag_amount + length(node.J) + 1 # remove prior upper bound
@@ -890,7 +883,6 @@ function solve_bpc(
         Vector{Int64}[], # solution
         0, # bounds_status
         Vector{Int64}[],
-        Int64[],
         Vector{Int64}[],
     )]
     
