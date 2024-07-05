@@ -682,7 +682,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
 
         # get values to build price
         m_obj = objective_value(master)
-        # println("m_obj: $(m_obj)")
+        # println(LOG_IO, "m_obj: $(m_obj)")
 
         pi_bar = dual.(demand_constraints_ref)
         if isempty(cut_constraints_ref) # trying to get from an empty array will raise error
@@ -691,7 +691,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
             sigma_bar = dual.(cut_constraints_ref)
         end
 
-        verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
+        verbose >= 1 && println(LOG_IO, "Z = $(m_obj)")
         
 
         # run price lp
@@ -703,7 +703,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
             new_bins = Vector{Float64}[q]
         end
 
-        # println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
+        println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
         # println("largest lambda: $(max(value.(lambdas)...))")
         # println("p_obj: $(p_obj)")
 
@@ -747,6 +747,11 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
                 #     end
                 # else
                 #     check_next_lambda = true
+                # end
+
+                # if S[end] == q
+                #     println("last bin: $(Int64[k for (k,v) in enumerate(label.items) if v > 0.5])")
+                #     error()
                 # end
 
                 # add new packing scheme to list
@@ -847,7 +852,7 @@ function solve_bpc(
     E::Vector{Vector{Int64}}, 
     w::Vector{Int64}, 
     W::Int64; 
-    time_limit::Int64=600,
+    time_limit::Int64=1800,
     verbose::Int64=1, 
     run_ffd::Bool=true, 
     epsilon::Float64=1e-4,
@@ -904,7 +909,7 @@ function solve_bpc(
 
         if time() - start_time >= time_limit
             println(LOG_IO, "out of time")
-            is_optimal = false
+            is_optimal = bounds[1] == bounds[2]
             break
         end
 
@@ -1183,6 +1188,12 @@ function solve_bpc(
                 end  
             end
 
+            if time() - start_time >= time_limit
+                println(LOG_IO, "out of time")
+                is_optimal = bounds[1] == bounds[2]
+                break
+            end                
+
             # if too many cuts already, skip the stop the cut adding loop
             if checks_done_this_node >= max_checks_per_node || length(node.subset_row_cuts) >= max_cuts
                 continue_adding_cuts = false
@@ -1210,6 +1221,7 @@ function solve_bpc(
                     
                     # add cut to master
                     con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/2)*l_p for (p, l_p) in enumerate(lambdas)]) <= 1, base_name="sr_cut_$(n)")
+                    println(con_ref)
     
                     # add to constraint to reference array
                     push!(cut_constraints_ref, con_ref)

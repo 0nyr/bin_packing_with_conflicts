@@ -244,6 +244,10 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
         # println("")    
     end
 
+    # println("good labels:")
+    # for label in good_labels
+    #     println("label rc: $(label.fcost[1]), items: $(Int64[k for (k,v) in enumerate(label.items) if v > 0.5])")
+    # end
 
     # return min_fcost, best_label.items
     return min_fcost, Vector{Float64}[label.items for label in good_labels]
