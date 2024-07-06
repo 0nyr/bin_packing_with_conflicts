@@ -703,7 +703,7 @@ function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_c
             new_bins = Vector{Float64}[q]
         end
 
-        println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
+        # println("last 10 lambdas: $(value.(lambdas)[max(end-10, 1):end])")
         # println("largest lambda: $(max(value.(lambdas)...))")
         # println("p_obj: $(p_obj)")
 
@@ -1221,7 +1221,7 @@ function solve_bpc(
                     
                     # add cut to master
                     con_ref = @constraint(master, sum([floor(sum([S[p][i] for i in cut_data])/2)*l_p for (p, l_p) in enumerate(lambdas)]) <= 1, base_name="sr_cut_$(n)")
-                    println(con_ref)
+                    # println(con_ref)
     
                     # add to constraint to reference array
                     push!(cut_constraints_ref, con_ref)

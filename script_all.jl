@@ -31,8 +31,8 @@ csv_table = open("time.csv", "a")
 # error("done!")
 
 # Files
-folder_path = "test"
-# folder_path = "Elhedhli"
+# folder_path = "test"
+folder_path = "Elhedhli"
 instances = [joinpath(folder_path, i) for i in readdir(joinpath("instances", folder_path))]
 mkpath(joinpath("logs", folder_path))
 
