@@ -14,9 +14,10 @@ verbose=1
 if do_compile_run
     # first run to compile
     println("DOING COMPILE RUN\n\n")
-    J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
+    # J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
     # J, w, E, W = read_file("test/BPWC_2_7_2.txt") 
     # J, w, E, W = read_file("biginterval/BPWC_1_1_3.txt") 
+    J, w, E, W = read_file("Elhedhli/BPWC_1_5_5.txt") 
     solution, z = solve_bpc(J, E, w, W, verbose=verbose, run_ffd=true, max_iter=10000)
 end
 
