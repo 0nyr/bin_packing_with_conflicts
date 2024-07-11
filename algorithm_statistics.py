@@ -7,6 +7,22 @@ import plotly.express as px
 
 #%%
 
+# estatisticas da raiz
+
+# Da primeira descida (sem cortes):
+# lower bound e tempo da primeira descida (sem cortes)
+# numero de colunas geradas
+# numero de iterações 
+
+# Nó raiz:
+# lower bound, tempo, quant. de cortes, numero de passadas no cga, 
+
+# Final
+# Lower bound, tempo, n de nós, Upper bound 
+
+# melhor solução conhecida
+
+
 folder ='Elhedhli'
 
 

@@ -215,7 +215,9 @@ function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Ve
     if !isempty(good_labels) && length(good_labels) > len_J/3
         avg_fcost = sum([i.fcost[1] for i in good_labels])/length(good_labels)
         filter!((x) -> x.fcost[1] < avg_fcost, good_labels)
+        # maintain label diversity
     end
+
 
     # Single label!
     min_fcost = Inf
