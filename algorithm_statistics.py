@@ -3,7 +3,9 @@
 
 import os
 import pandas as pd
+import plotly.express as px
 
+#%%
 
 folder ='Elhedhli'
 
@@ -37,13 +39,11 @@ df
 instance_sets = [elhedhli_dictionary[k] for k in elhedhli_dictionary]
 set_dfs = {k: df.loc[df['set'] == k] for k in instance_sets}
 
-set_dfs
-
-for k in set_dfs:
-    if len(set_dfs[k]) != 0:
-        print(f'set {k}:')
-        print(set_dfs[k])
-        print('\n')
+# for k in set_dfs:
+#     if len(set_dfs[k]) != 0:
+#         print(f'set {k}:')
+#         print(set_dfs[k])
+#         print('\n')
 
 # %%
 
@@ -52,6 +52,10 @@ set_dfs['u120']
 #%%
 
 set_dfs['u120'].loc[set_dfs['u120']['optimal'] == 1][['time']].describe()
+
+#%%
+
+px.histogram(set_dfs['u120'].loc[set_dfs['u120']['optimal'] == 1], x='time', title='Solved - u120', nbins=40)
 
 #%% 
 
