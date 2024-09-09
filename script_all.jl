@@ -8,11 +8,17 @@ println("starting with $(Threads.nthreads()) threads")
 do_compile_run = false
 do_compile_run = true
 
+verbose=0
+verbose=1
+
 if do_compile_run
     # first run to compile
     println("DOING COMPILE RUN\n\n")
-    J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
-    solution, z = solve_bpc(J, E, w, W, verbose=0, run_ffd=true, max_iter=10000)
+    # J, w, E, W = read_file("test/BPWC_0_6_8.txt") 
+    # J, w, E, W = read_file("test/BPWC_2_7_2.txt") 
+    # J, w, E, W = read_file("biginterval/BPWC_1_1_3.txt") 
+    J, w, E, W = read_file("Elhedhli/BPWC_1_5_5.txt") 
+    solution, z = solve_bpc(J, E, w, W, verbose=verbose, run_ffd=true, max_iter=10000)
 end
 
 # General log
@@ -23,10 +29,11 @@ global_logger(logger) # set as default logger
 # csv with time and details file
 csv_table = open("time.csv", "a")
 
+# error("done!")
 
 # Files
-folder_path = "test"
-# folder_path = "Elhedhli"
+# folder_path = "test"
+folder_path = "Elhedhli"
 instances = [joinpath(folder_path, i) for i in readdir(joinpath("instances", folder_path))]
 mkpath(joinpath("logs", folder_path))
 
@@ -48,7 +55,7 @@ for file_path in instances
     
     # solve and get time elapsed
     println(LOG_IO, "J: $(J)\nw: $(w)\nW: $(W)\nE: $(E)")
-    passed_time = @elapsed solution, z, is_optimal = solve_bpc(J, E, w, W, time_limit=600, verbose=0, run_ffd=true, max_iter=10000)
+    passed_time = @elapsed solution, z, is_optimal = solve_bpc(J, E, w, W, time_limit=600, verbose=verbose, run_ffd=true, max_iter=10000)
     println(LOG_IO, "solution: $(solution)\nz: $(z)")
     
     # register at general log

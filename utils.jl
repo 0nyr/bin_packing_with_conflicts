@@ -98,7 +98,7 @@ function find_ryan_foster_branch(bags_in_use, lambda_bar, S, w; epsilon=1e-4)
     bag_closest = 1
     for q in bags_in_use
         
-        items_in_q = Int64[i for (i, val) in enumerate(S[q]) if val > epsilon] 
+        items_in_q = Int64[i for (i, val) in enumerate(S[q]) if val > 0.5] 
 
         # println(LOG_IO, "checking integrality of $(q)")
 
@@ -136,7 +136,7 @@ function find_ryan_foster_branch(bags_in_use, lambda_bar, S, w; epsilon=1e-4)
 end
 
 "Analyze branching possibilities"
-function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float32}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float64=1e-4)
+function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{Float64}, S::Vector{Vector{Float64}}, S_len::Int64, conflicts::Vector{Vector{Int64}}, J::Vector{Int64}, w::Vector{Int64}; epsilon::Float64=1e-4)
     
     
     # find most fractional item (by weight) and most fractional bag 
@@ -173,7 +173,7 @@ function make_branching_analysis(bags_in_use::Vector{Int64}, lambda_bar::Vector{
     # frac_bags_frac_weights = fractional_bags_weights.*Float64[lambda_bar[q] for q in fractional_bags]
 
     # # amount of *items* in each bag
-    # bag_item_amount = Float32[sum(S[q]) for q in fractional_bags]
+    # bag_item_amount = Float64[sum(S[q]) for q in fractional_bags]
 
     # # conflicts of each bag
     # bag_conflicts = Vector{Int64}[Int64[0 for j in J] for i in bags_in_use]
@@ -199,9 +199,9 @@ end
 
 "returns {i | λ_i > 0 ∀ i}"
 function get_bags_in_use(lambda_bar, S, S_len, J; epsilon=1e-4)
-    # bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
+    # bags = Vector{Float64}[Float64[0.0 for j in J] for i in J]
     bags_in_use = Int64[]
-    # lambdas_in_use = Float32[]
+    # lambdas_in_use = Float64[]
 
     # get bags selected for use
     for q in 1:S_len
@@ -217,7 +217,7 @@ end
 
 "from lambda, returns x"
 function get_x(lambda_bar, S, S_len, J; epsilon=1e-4)
-    bags = Vector{Float32}[Float32[0.0 for j in J] for i in J]
+    bags = Vector{Float64}[Float64[0.0 for j in J] for i in J]
 
     # get bags selected for use
     bag_amount = 0
@@ -365,15 +365,52 @@ function get_pretty_solution(bags, bags_amount; epsilon=1e-4)
 end
 
 get_demand_constraints(model, J) = [constraint_by_name(model, "demand_$(i)") for i in J]
+get_cut_constraints(model, cuts_amount::Int64) = [constraint_by_name(model, "sr_cut_$(i)") for i in 1:cuts_amount]
+
 reduced_cost(x, pi_bar, J) = 1 - sum([pi_bar[j]*x[j] for j ∈ J])
 
-"Utility function for retrieving master data necessary for the pricing step"
-function get_master_data_for_pricing(master, J; verbose=2)
-    m_obj = objective_value(master)
-    verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
 
-    demand_constraints = get_demand_constraints(master, J)
-    pi_bar = dual.(demand_constraints)
+# "Utility function for retrieving master data necessary for the pricing step"
+# function get_master_data_for_pricing(master, J::Vector{Int64}, subset_row_cuts::Vector{Vector{Int64}}; verbose=2)
+#     m_obj = objective_value(master)
+#     verbose >= 2 && println(LOG_IO, "Z = $(m_obj)")
 
-    return m_obj, demand_constraints, pi_bar
+#     demand_constraints = get_demand_constraints(master, J)
+#     pi_bar = dual.(demand_constraints)
+
+#     cut_constraints
+
+
+#     return m_obj, demand_constraints, pi_bar
+# end
+
+
+# FUNCTIONS FOR DEBUGGING
+function print_node_status(node, original_w)
+    println("best_node = $(node.id)")
+    println("J = $(node.J)")
+    println("w = $(node.w)")
+    println("E = $(sort(translate_edges(node.E, node.item_address)))")
+    println("W = $(node.W)")
+    println("sol = $(Vector{Int64}[Int64[j for (j, val) in enumerate(bin) if val > 0.5] for bin in node.solution])")
+
+    println("\n\n")
+
+    println("item_address_enum = $([i for i in enumerate(node.item_address)])")
+    println("adress_item_enum = $( sort([(i[2], i[1]) for i in enumerate(node.item_address)]) )")
+
+    println("original_w = $(original_w)")
+    println("branch_history = $(node.branch_history)")
+    println("E_on_original_G = $(node.E)")
+end
+
+function search_code(target, S)
+    found = false
+    for q in S
+        pretty_q = Int64[n for (n, v) in enumerate(q) if v > .5]
+        if pretty_q == target
+            found = true
+        end
+    end
+    return found
 end

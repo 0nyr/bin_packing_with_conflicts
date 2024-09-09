@@ -3,10 +3,11 @@ pisinger/
 sadykov2013/
 out.txt/
 out/
+*.zip
 
 logs/
 log.txt
-time.csv
+# time.csv
 
 thread.jl
 

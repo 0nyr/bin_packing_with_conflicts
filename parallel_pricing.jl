@@ -2,14 +2,16 @@ using DataStructures
 
 struct Label
     rcost::Float64 # less is better
+    fcost::Vector{Float64} # reduced cost considering cut violations (less is better)
     weight::Int64 # current weight
     last_item_added::Int # item added in this label
-    # prev_lab::Vector{Label} # last label
     items::BitVector # items in the bin so far
     conflicts::BitVector # conflics that will be found by moving forward
-
+    m::Vector{Int64} # amount of custumers involved in cut i for i in cuts: |S_i ∩ V(L)|
+    sigma_ref::Vector{Float64} # necessary for dominance criteria...
 end
 
+# auxiliary stuff
 SPINLOCK = Threads.SpinLock()
 
 "Returns true if l1 dominates l2"
@@ -17,20 +19,63 @@ function Base.isless(l1::Label, l2::Label)
 
     # l1 dominates l2 if:
     #   the possibilities set of l1 *at least contains* the possibilities set of l2
-    #   l1 has smaller reduced cost
+    #   l1 has smaller reduced cost (considering cut related effects)
 
     if l1.weight <= l2.weight
-        if l1.rcost <= l2.rcost
-            return all(l1.conflicts .<= l2.conflicts)
+        if all(l1.conflicts .<= l2.conflicts)
+
+            sum_sigma_q_in_Q = 0
+            if length(l1.m) != 0
+                
+                # get sigmas smaller than zero
+                negative_sigma = l1.sigma_ref .< -1e-4
+            
+                if any(negative_sigma)
+                    
+                    for (q, is_negative) in enumerate(negative_sigma) # start by checking sigma, most likely positive 
+                        if is_negative
+
+                            # tau_l1 > tau_l2 ?
+                            if l1.m[q] % 2 > l2.m[q] % 2 
+                                sum_sigma_q_in_Q += l1.sigma_ref[q]     
+                            end
+                        end
+                    end
+                end
+            end
+            return l1.fcost[1] - sum_sigma_q_in_Q <= l2.fcost[1]
+            # return l1.rcost - sum_sigma_q_in_Q <= l2.rcost
+            # return l1.fcost[1] <= l2.fcost[1]
         else
             return false
         end
     else
         return false
     end
+
 end
 
-function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, epsilon=1e-4)
+"Updates the amount of customers involved in each cut after the label visits customer i"
+function update_m(label, i, cuts_binary_data)
+    for (k, cut_k) in enumerate(cuts_binary_data)
+        if cut_k[i]
+            label.m[k] += 1
+        end
+    end
+end
+
+"Updates the label final cost (the reduced cost considering cut violations)"
+function update_fcost(label::Label)
+    label.fcost[1] = label.rcost - sum(label.sigma_ref.*floor.(label.m / 2))
+end
+
+"Dynamic programming (labelling) price"
+function dp_price(J::Vector{Int64}, len_J::Int64, rc::Vector{Float64}, sigma::Vector{Float64}, positive_rcost::Vector{Bool}, w::Vector{Int64}, binarized_E::Vector{BitVector}, W::Int64, subset_row_cuts::Vector{Vector{Int64}}, cuts_binary_data::Vector{BitVector}; verbose=3, epsilon=1e-4)
+
+    # fast_labelling = false
+
+    # auxiliary data structure
+    # sigma_multiplier = Float64[0.0 for i in subset_row_cuts]
 
     buckets = Vector{Label}[Label[] for i in J]
 
@@ -42,8 +87,10 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
 
         # label = Label(rc[i], w[i], i, Label[], deepcopy(binarized_E[i][i+1:end]))
         # label = Label(1-rc[i], w[i], i, Label[], deepcopy(binarized_E[i]))
-        label = Label(1-rc[i], w[i], i, falses(len_J), deepcopy(binarized_E[i]))
+        label = Label(1-rc[i], Float64[0.0], w[i], i, falses(len_J), deepcopy(binarized_E[i]), Int64[0 for _ in subset_row_cuts], sigma)
         label.items[i] = true
+        update_m(label, i, cuts_binary_data)
+        update_fcost(label)
 
         push!(buckets[i], label)
 
@@ -52,6 +99,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
         end
     end
 
+    # was_extended = false
     trash = Dict{Label, Nothing}()
     # println("starting extensions")
     while !isempty(to_extend)
@@ -68,6 +116,7 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
             continue
         end
 
+        was_extended = false
         Threads.@threads for i in curr_label.last_item_added+1:len_J
 
             # if the item has negative reduced cost, skip it
@@ -93,21 +142,23 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
 
             new_label = Label(
                 curr_label.rcost - rc[i], 
+                Float64[0.0],
                 new_weight, 
                 i, 
                 # Label[curr_label], 
                 deepcopy(curr_label.items), 
                 new_next_conflicts,
                 # curr_label.conflicts[i-curr_label.last_item_added+1:end] .|| binarized_E[i+1:end],
+                deepcopy(curr_label.m),
+                sigma,
             )
 
             new_label.items[i] = true
-
-
+            update_m(new_label, i, cuts_binary_data)
+            update_fcost(new_label)
 
             # check for domination
             dominated = Dict{Label, Nothing}()
-            clean_bucket = false
             clean_matrix = false
             new_label_is_dominated = false
             for label in buckets[i]
@@ -146,40 +197,62 @@ function dp_price(J, len_J, rc, positive_rcost, w, binarized_E, W; verbose=3, ep
                     push!(buckets[i], new_label)
                     push!(to_extend, new_label)
                 end
+                was_extended = true
                 # println(new_label)
             end 
         end
+
+        # if !was_extended && fast_labelling && 
+        #     break
+        # end
     end
 
-    min_rcost = Inf
+    # if fast_labelling && !was_extended
+
+    # Multiple labels!
+    good_labels = vcat(Vector{Label}[filter((x) -> x.fcost[1] < -1e-4, bucket) for bucket in buckets]...)
+
+    if !isempty(good_labels) && length(good_labels) > len_J/3
+        avg_fcost = sum([i.fcost[1] for i in good_labels])/length(good_labels)
+        filter!((x) -> x.fcost[1] < avg_fcost, good_labels)
+        # maintain label diversity
+    end
+
+
+    # Single label!
+    min_fcost = Inf
     best_label = nothing
-    for bucket in buckets
-        for label in bucket
-            if label.rcost < min_rcost
-                min_rcost = label.rcost
-                best_label = label
-            end
+    for label in good_labels
+        if label.fcost[1] < min_fcost
+            min_fcost = label.fcost[1]
+            best_label = label
         end
     end
 
-    # println("best label: ", best_label)
-
-    # new_bin = falses(len_J)
-    # if min_rcost < -epsilon && min_rcost < Inf
-    #     label = best_label
+    if !isempty(good_labels)
+        if best_label.weight > W
+            error("label $(best_label) is too heavy: $(best_label.weight)")
+        end
+    
+        # println("best new bin:")
+        # println("sigma: $(sigma)")
+        # println("m: $(best_label.m)")
+        # println("k: $(sr_k)")
+        # println("rcost: $(best_label.rcost)")
+        # println("fcost: $(best_label.fcost[1])")
         
-    #     done = false
-    #     while !done
-    #         new_bin[label.last_item_added] = true
-    #         if isempty(label.prev_lab) # is this the last label?
-    #             done = true
-    #         else
-    #             label = label.prev_lab[1]
-    #         end
-    #     end
+        # println("found $(length(good_labels)) bins")
+        
+        # println("")    
+    end
+
+    # println("good labels:")
+    # for label in good_labels
+    #     println("label rc: $(label.fcost[1]), items: $(Int64[k for (k,v) in enumerate(label.items) if v > 0.5])")
     # end
-    # println("new_bin: $(new_bin)")
-    return min_rcost, best_label.items
+
+    # return min_fcost, best_label.items
+    return min_fcost, Vector{Float64}[label.items for label in good_labels]
 end
 
 
