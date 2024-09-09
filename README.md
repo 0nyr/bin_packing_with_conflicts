@@ -8,5 +8,4 @@ The solution was implemented using Julia JuMP, to be used with the Gurobi solver
 - Ryan and Foster branching scheme
 - Martello L2 lower bound calculation
 - First Fit Decreasing (FFD) heuristic considering conflicts
-- Pricing heuristic (relaxed LP pricing, rounded to integer)
 - Simple labelling price (paralellized)
