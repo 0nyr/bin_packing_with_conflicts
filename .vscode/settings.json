@@ -4,5 +4,6 @@
     "julia.plots.path": "figures",
     "julia.focusPlotNavigator": true,
     "julia.inlayHints.runtime.enabled": true,
-    "julia.inlayHints.static.parameterNames.enabled": "all"
+    "julia.inlayHints.static.parameterNames.enabled": "all",
+    "julia.environmentPath": "/home/onyr/code/phd/bin_packing_with_conflicts/turing"
 }

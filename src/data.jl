@@ -1,7 +1,6 @@
-function read_file(filename)
-
-    filepath = string(@__DIR__, "/instances/", filename)
-
+function read_file(
+    filepath::String
+)
     J = Int64[]
     w = Int64[]
     E = Vector{Int64}[]
