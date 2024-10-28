@@ -85,8 +85,17 @@ function merge_items(i::Int64, j::Int64, J::Vector{Int64}, original_w::Vector{In
 end
 
 "makes children with ryan and foster branching"
-function make_child_node_with_rf_branch(node::Node, j::Int64, q::Vector{Float64},  original_w::Vector{Int64}, nodes::Vector{Node}, node_counter::Vector{Int64}, bags_in_use::Vector{Int64}, cuts_binary_data::Vector{BitVector}, cuts_in_use)
-    
+function make_child_node_with_rf_branch(
+    node::Node, 
+    j::Int64, 
+    q::Vector{Float64},  
+    original_w::Vector{Int64}, 
+    nodes::Vector{Node}, 
+    node_counter::Vector{Int64}, 
+    bags_in_use::Vector{Int64}, 
+    cuts_binary_data::Vector{BitVector}, 
+    cuts_in_use
+)
     w = node.w
     W = node.W
 
@@ -659,8 +668,56 @@ function cut_separation_enum(J, lambda_bar, S, triplets, triplets_tracker, max_p
     return violations, cuts_index
 end
 
-function cga(master, w, W, J, E, lambdas, S, S_len, forbidden_bags, subset_row_cuts, cuts_binary_data, demand_constraints_ref, cut_constraints_ref, binarized_E; verbose=3, max_iter=10e2, epsilon=1e-4, using_dp=true)
-    
+"""
+Column Generation algorithm (CGA)
+
+The CGA searches for new columns (bins) to add based on the dual values of the Master Problem.
+
+# Arguments
+- `master`: The master problem model.
+- `w`: Vector of item weights.
+- `W`: Bin capacity.
+- `J`: Set of items.
+- `E`: Set of edges representing conflicts between items.
+- `lambdas`: Vector of lambda variables representing the packing schemes.
+- `S`: Set of packing schemes.
+- `S_len`: Length of the set of packing schemes.
+- `forbidden_bags`: Set of forbidden packing schemes.
+- `subset_row_cuts`: Set of subset row cuts.
+- `cuts_binary_data`: Binary representation of the subset row cuts.
+- `demand_constraints_ref`: References to the demand constraints in the master problem.
+- `cut_constraints_ref`: References to the cut constraints in the master problem.
+- `binarized_E`: Binary representation of the conflict graph.
+- `verbose`: Verbosity level for logging.
+- `max_iter`: Maximum number of iterations for the CGA.
+- `epsilon`: Tolerance for numerical stability.
+- `using_dp`: Flag to indicate whether to use dynamic programming for pricing.
+
+# Returns
+- `m_obj`: Objective value of the master problem.
+- `cga_lower_bound`: Lower bound obtained from the CGA.
+- `S_len`: Updated length of the set of packing schemes.
+"""
+function cga(
+    master, # master problem
+    w, 
+    W, 
+    J, 
+    E, 
+    lambdas, 
+    S, 
+    S_len, 
+    forbidden_bags, 
+    subset_row_cuts, 
+    cuts_binary_data, 
+    demand_constraints_ref, 
+    cut_constraints_ref, 
+    binarized_E; 
+    verbose=3, 
+    max_iter=10e2, 
+    epsilon=1e-4, 
+    using_dp=true
+)
     check_next_lambda = false
 
     len_J = length(J)

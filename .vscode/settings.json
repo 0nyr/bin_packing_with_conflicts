@@ -1,3 +1,8 @@
 {
-    "cmake.sourceDirectory": "C:/Users/danie/.github/bpc/sadykov2013"
+    "julia.execution.codeInREPL": true,
+    "julia.inlayHints.static.enabled": true,
+    "julia.plots.path": "figures",
+    "julia.focusPlotNavigator": true,
+    "julia.inlayHints.runtime.enabled": true,
+    "julia.inlayHints.static.parameterNames.enabled": "all"
 }
